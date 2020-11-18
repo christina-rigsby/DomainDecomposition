@@ -57,28 +57,29 @@ template <int dim>
 class Step6
 {
 public:
-    Step6(const unsigned subdomain);
-    void run();
+    Step6(const unsigned int subdomain);
+    void run(const unsigned int cycle, const unsigned int s);
 
-    void set_all_subdomain_objects (std::vector<shared_ptr<Step6<dim>>> &objects)
+    void set_all_subdomain_objects (const std::vector<std::shared_ptr<Step6<dim>>> &objects)
     { subdomain_objects = objects; }
+
+    std::vector<std::unique_ptr<Functions::FEFieldFunction<dim>>> solutionfunction_vector;
 
 
 
 private:
-    void setup_system(unsigned int subdomain);
-    void assemble_system(unsigned int subdomain, const unsigned int cycle);
+    void setup_system();
+    void assemble_system(const unsigned int cycle, const unsigned int s);
+    Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id, const unsigned int cycle);
     void solve();
     void refine_grid();
-    void output_results(const unsigned int cycle) const;
+    void output_results(const unsigned int cycle, const unsigned int s) const;
 
-    const unsigned int my_subdomain;
+    std::vector<std::shared_ptr<Step6<dim>>> subdomain_objects;
 
-    std::vector<shared_ptr....> subdomain_objects; // subdomain_ids,
-
+    const unsigned int subdomain;
 
     Triangulation<dim> triangulation;
-
 
     FE_Q<dim>       fe;
     DoFHandler<dim> dof_handler;
@@ -89,9 +90,6 @@ private:
 
     Vector<double> solution;
     Vector<double> system_rhs;
-
-    //Want to store solutions for each subdomain to be retrieved later...
-    std::vector<std::unique_ptr<Functions::FEFieldFunction<dim>>> solutionfunction_vector;
 
 };
 
@@ -108,9 +106,10 @@ double coefficient(const Point<dim> &p)
 
 template <int dim>
 Step6<dim>::Step6(const unsigned int subdomain)
-        :  my_subdomain (subdomain) ////////////////////////
-        , fe(2)
-        , dof_handler(triangulation)
+
+        : subdomain (subdomain),
+        fe(2),
+        dof_handler(triangulation)
 
 {
     //Create separate triangulations for each subdomain:
@@ -140,10 +139,10 @@ Step6<dim>::Step6(const unsigned int subdomain)
         }
     }
 
+    setup_system();
+
 
 }
-
-
 
 
 template <int dim>
@@ -174,48 +173,38 @@ void Step6<dim>::setup_system()
 
 }
 
-//Need function to get the appropriate solution fe_function.
-// Specifically, with only two subdomains, we know that this appropriate fe_function is the one
-// created from the previously computed solution, and therefore, is the last entry of our vector of solutions:
-//
-
+//Need function to get the appropriate solution fe_function:
 template<int dim>
-Functions::FEFieldFunction<dim>::get_fe_function(unsigned int boundary_id, unsigned int cycle)
+Functions::FEFieldFunction<dim> &
+        Step6<dim>::get_fe_function(unsigned int boundary_id, unsigned int cycle)
 {
-    //Since we know that we only have two subdomains, we know that the last entry of the solution vector is that
-    //of the other subdomain which we need to impose as a BC of the current subdomain:
-    fe_function = solutionfunction_vector[solutionfunction_vector.size()-1];
 
-    //More generally, we will need to retrieve the
-    // {[(# of subdomains)*(cycle-1)]+(subdomain# whose solution will be the BC-cycle)}th entry:
+    // get other subdomain id
+    types::subdomain_id relevant_subdomain;
 
-    //fe_function = solutionfunction_vector[subdomain_problems.size()*(cycle-1)+(relevant subdomain number)]
-    //relevant subdomain number can be retrieved using the boundary_id#
-
-    /*
-    int relevant_subdomain;
-
+    //only handle nonzero boundary_ids for now:
     if (boundary_id == 1){
-        relevant_subdomain = 1;
-    } else if (boundary_id == 2){
         relevant_subdomain = 0;
-    } else //boundary_id = 0
+    } else if (boundary_id == 2){
+        relevant_subdomain = 1;
+    } else
         relevant_subdomain = -1;
 
-    if (relevant_subdomain == -1) { //equivalently checking if boundary_id = 0
-        fe_function = ZeroFunction //How do I make this of type FEFieldFunction?
-    } else {
-        fe_function = solutionfunction_vector[subdomain_problems.size()*(cycle - 1)+(relevant_subdomain)]
+    //For Multiplicative Schwarz, we impose the most recently computed solution from neighboring subdomains as the
+    // BC of the current subdomain, so we retrieve the last entry of the appropriate solutionfunction_vector:
+    return *subdomain_objects[relevant_subdomain] -> solutionfunction_vector.back();
 
-    }
-    */
+    //Later, for Additive Schwarz, we will sometimes need to access the second to last element of a
+    // solutionfunction_vector.
 
-    return fe_function;
 }
 
 template <int dim>
-void Step6<dim>::assemble_system(unsigned int subdomain, unsigned int cycle)
+void Step6<dim>::assemble_system(unsigned int cycle, unsigned int s)
 {
+    system_matrix = 0;
+    system_rhs = 0;
+
     const QGauss<dim> quadrature_formula(fe.degree + 1);
 
     FEValues<dim> fe_values(fe,
@@ -254,83 +243,40 @@ void Step6<dim>::assemble_system(unsigned int subdomain, unsigned int cycle)
     }
 
 
-    //Functions::FEFieldFunction<dim> fe_function(dof_handler, solution);
-
-
     std::map<types::global_dof_index, double> boundary_values;
 
-
-    /*if (cycle == 0 && subdomain == 0){
-        //When cycle=0 and subdomain=0, the only boundary_ids that exist in our system are 0 and 2
-        VectorTools::interpolate_boundary_values(dof_handler,
-                                                 0,
-                                                 Functions::ZeroFunction<dim>(),
-                                                 boundary_values);
-
-        VectorTools::interpolate_boundary_values(dof_handler,
-                                                 2,
-                                                 Functions::ZeroFunction<dim>(),
-                                                 boundary_values);
-
-
-    } else if (subdomain == 1) {
-
-        VectorTools::interpolate_boundary_values(dof_handler,
-                                                 0,
-                                                 Functions::ZeroFunction<dim>(),
-                                                 boundary_values);
-
-        VectorTools::interpolate_boundary_values(dof_handler,
-                                                 1,
-                                                 fe_function, //need to use get_fe_function() here
-                                                 boundary_values);
-
-
-    } else { //subdomain == 0, cycle > 1
-        VectorTools::interpolate_boundary_values(dof_handler,
-                                                 0,
-                                                 Functions::ZeroFunction<dim>(),
-                                                 boundary_values);
-
-        VectorTools::interpolate_boundary_values(dof_handler,
-                                                 2,
-                                                 fe_function1, //need to use get_fe_function() here
-                                                 boundary_values);
-
-    }*/
-    //Do not need to check for subdomains anymore. Regardless of which subdomain we are setting up to solve, the
-    //boundary condition will come from the solution last computed.
     VectorTools::interpolate_boundary_values(dof_handler,
                                              0,
                                              Functions::ZeroFunction<dim>(),
                                              boundary_values);
 
-    VectorTools::interpolate_boundary_values(dof_handler,
-                                             1,
-                                             //fe_function,
-                                             get_fe_function(1, cycle),
-                                             boundary_values);
+    if (cycle == 1){
+         if (s==0) { //solutionfunction_vector of subdomain1 is empty!
+             // We can work around the need for this if-else block later by having the first entry of
+             // each solutionfunction_vector be the ZeroFunction of type FEFieldFunction...
+             VectorTools::interpolate_boundary_values(dof_handler,
+                                                      2,
+                                                      Functions::ZeroFunction<dim>(),
+                                                      boundary_values);
 
-    VectorTools::interpolate_boundary_values(dof_handler,
-                                             2,
-                                             get_fe_function(2, cycle),
-                                             boundary_values);
-            //When subdomain 0 is created, there is no edge with boundary_id=2.
-            // Is this a problem or does interpolate_boundary_id() check for boundary_ids, apply the given function
-            // to the edge with this id, and do nothing when the given boundary_id is not found?
+         } else { //s=1, here we use the most recent solution from subdomain0
+             VectorTools::interpolate_boundary_values(dof_handler,
+                                                      1,
+                                                      get_fe_function(1, cycle),
+                                                      boundary_values);
+         }
 
-            //Also, after subdomain1 is created, we have now assigned boundary_id=2 to gamma2.
-            // When solving on subdomain0, the edge with boundary_id=2 is not a boundary edge of subdomain0,
-            // so even if we have:
-            //                  VectorTools::interpolate_boundary_values(dof_handler, 2, ...)
-            // I would hope that interpolate_boundary_values() does not try to apply boundary conditions on gamma2.
-            //Is this the case?
+    } else { //now all solutionfunction_vectors have at least has one entry that we can retrieve with get_fe_function()
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 1,
+                                                 get_fe_function(1, cycle),
+                                                 boundary_values);
 
-            //Similarly, when solving on subdomain1, gamma1 is not a boundary edge of the current subdomain and I would
-            // hope that no conditions are enforced over this edge.
-
-            //If interpolate_boundary_values enforces conditions on ANY edge with the provided boundary_id, I will need
-            // to know which subdomain I am solving on so that I only impose conditions on the appropriate edges.
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 2,
+                                                 get_fe_function(2, cycle),
+                                                 boundary_values);
+    }
 
 
     MatrixTools::apply_boundary_values(boundary_values,
@@ -354,14 +300,9 @@ void Step6<dim>::solve()
     constraints.distribute(solution);
 
 //Store solution as function that can be retrieved elsewhere:
-    //std::vector<std::unique_ptr<Functions::FEFieldFunction<dim>>> solutionfunction_vector; //declared elsewhere
     std::unique_ptr<Functions::FEFieldFunction<dim>> pointer =
             std::make_unique<Functions::FEFieldFunction<dim>>(dof_handler, solution);
-    solutionfunction_vector.emplace_back(pointer);
-
-    //So we are storing only the solution as a function, not storing the associated dof_handler...
-    //Since each subdomain has a separate triangulation, will we actually need to store the dof_handler along with the
-    // solution function in case we need to translate from one dof_handler to another?
+    solutionfunction_vector.emplace_back (std::move(pointer));
 
 }
 
@@ -382,19 +323,20 @@ void Step6<dim>::refine_grid()
                                                     0.03);
     triangulation.execute_coarsening_and_refinement();
 
-
-
 }
 
 
 
 template <int dim>
-void Step6<dim>::output_results(const unsigned int cycle) const
+void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s) const
 {
     {
 
         GridOut grid_out;
-        std::ofstream output("grid-" + std::to_string(cycle) + ".gnuplot");
+
+        //std::ofstream output("grid-" + std::to_string(cycle) + ".gnuplot");
+        std::ofstream output("grid-" + std::to_string(cycle) + "-" + std::to_string(s)  +".gnuplot");
+
         GridOutFlags::Gnuplot gnuplot_flags(false, 5);
         grid_out.set_flags(gnuplot_flags);
         MappingQGeneric<dim> mapping(3);
@@ -407,54 +349,42 @@ void Step6<dim>::output_results(const unsigned int cycle) const
         data_out.attach_dof_handler(dof_handler);
         data_out.add_data_vector(solution, "solution");
         data_out.build_patches();
-        std::ofstream output("solution-" + std::to_string(cycle) + ".vtu");
+
+        //std::ofstream output("solution-" + std::to_string(cycle) + ".vtu");
+        std::ofstream output("solution-" + std::to_string(cycle) + "-" + std::to_string(s) + ".vtu");
+
         data_out.write_vtu(output);
 
     }
 }
 
 
-template<int dim>
-void set_all_subdomain_objects(std::vector<std::shared_ptr<Step6<2>>> subdomain_problems)
-{
-
-
-}
-
-
-
 
 template <int dim>
-void Step6<dim>::run() {
+void Step6<dim>::run(const unsigned int cycle, const unsigned int s) {
 
-    for (unsigned int cycle = 1; cycle < 8; ++cycle) { //in cycle=0, we did all of the set up (in the constructor)
+    //refine_grid(); //incorporate this later
+    std::cout << "   Number of active cells:       "
+              << triangulation.n_active_cells() << std::endl;
+    std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
+              << std::endl;
 
-    /*
-        if (cycle == 0) {
-            GridGenerator::hyper_rectangle(triangulation, corner_points[2 * subdomain],
-                                           corner_points[2 * subdomain + 1]);
-            triangulation.refine_global(1);
+    assemble_system(cycle, s);
 
-            //set the boundary_id to 2 along gamma2:
-            for (const auto &cell : triangulation.cell_iterators())
-                for (const auto &face : cell->face_iterators()) {
-                    const auto center = face->center();
-                    if ((std::fabs(center(0) - (0.25)) < 1e-12))
-                        face->set_boundary_id(2);
-                }
-*/ //moved this to Step6 constructor
+        //For debugging purposes only:
+        std::cout << "   Number of active cells:       "
+                  << triangulation.n_active_cells() << std::endl;
+        std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl;
 
-            refine_grid();
-            std::cout << "   Number of active cells:       "
-                      << triangulation.n_active_cells() << std::endl;
-            setup_system();
-            std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
-                      << std::endl;
-            assemble_system(cycle);
-            solve();
-            output_results(cycle);
+    solve();
 
-    }
+    output_results(cycle, s);
+
+        //For debugging purposes only:
+        std::cout << "Cycle:  " << cycle << std::endl;
+        std::cout << "Subdomain:  " << s << std::endl;
+
+
 }
 
 
@@ -463,21 +393,20 @@ int main()
 {
     try
     {
-        Step6<2> laplace_problem_2d;
-        //laplace_problem_2d.run();
 
         std::vector<std::shared_ptr<Step6<2>>> subdomain_problems;
-        subdomain_problems.push_back (std::make_shared<...> (0));
-        subdomain_problems.push_back (std::make_shared<...> (1));
+        subdomain_problems.push_back (std::make_shared<Step6<2>> (0));
+        subdomain_problems.push_back (std::make_shared<Step6<2>> (1));
 
+        // Tell each of the objects representing one subdomain each about
+        // the objects representing all of the other subdomains
         for (unsigned int s=0; s<subdomain_problems.size(); ++s)
             subdomain_problems[s] -> set_all_subdomain_objects(subdomain_problems);
 
 
-        //for(iteration...)
         for (unsigned int cycle = 1; cycle < 8; ++cycle)
             for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
-                ...update subdomain s in iteration i;
+                subdomain_problems[s] -> run(cycle, s);
             }
 
     }
