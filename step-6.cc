@@ -188,7 +188,7 @@ Functions::FEFieldFunction<dim> &
     } else if (boundary_id == 2){
         relevant_subdomain = 1;
     } else
-        relevant_subdomain = -1;
+        Assert (false, ExcInternalError()); // always aborts the program
 
     //For Multiplicative Schwarz, we impose the most recently computed solution from neighboring subdomains as the
     // BC of the current subdomain, so we retrieve the last entry of the appropriate solutionfunction_vector:
@@ -335,7 +335,7 @@ void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s) 
         GridOut grid_out;
 
         //std::ofstream output("grid-" + std::to_string(cycle) + ".gnuplot");
-        std::ofstream output("grid-" + std::to_string(cycle) + "-" + std::to_string(s)  +".gnuplot");
+        std::ofstream output("grid-" + std::to_string(s*100 + cycle)  +".gnuplot");
 
         GridOutFlags::Gnuplot gnuplot_flags(false, 5);
         grid_out.set_flags(gnuplot_flags);
@@ -351,7 +351,7 @@ void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s) 
         data_out.build_patches();
 
         //std::ofstream output("solution-" + std::to_string(cycle) + ".vtu");
-        std::ofstream output("solution-" + std::to_string(cycle) + "-" + std::to_string(s) + ".vtu");
+        std::ofstream output("solution-" + std::to_string(s*100 + cycle) + ".vtu");
 
         data_out.write_vtu(output);
 
@@ -404,7 +404,7 @@ int main()
             subdomain_problems[s] -> set_all_subdomain_objects(subdomain_problems);
 
 
-        for (unsigned int cycle = 1; cycle < 8; ++cycle)
+        for (unsigned int cycle = 1; cycle < 9; ++cycle)
             for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
                 subdomain_problems[s] -> run(cycle, s);
             }
