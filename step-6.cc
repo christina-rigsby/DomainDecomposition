@@ -70,7 +70,7 @@ public:
 private:
     void setup_system();
     void assemble_system(const unsigned int cycle, const unsigned int s);
-    Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id, const unsigned int cycle);
+    Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id);
     void solve();
     void refine_grid();
     void output_results(const unsigned int cycle, const unsigned int s) const;
@@ -119,7 +119,8 @@ Step6<dim>::Step6(const unsigned int subdomain)
     GridGenerator::hyper_rectangle(triangulation, corner_points[2 * subdomain],
                                    corner_points[2 * subdomain + 1]);
 
-    triangulation.refine_global(1);
+    //triangulation.refine_global(1);
+    triangulation.refine_global(2); //refined again to try to debug strange visualizations (mentioned in journal)
 
     //set the boundary_id to 2 along gamma2:
     if (subdomain == 0) {
@@ -176,7 +177,7 @@ void Step6<dim>::setup_system()
 //Need function to get the appropriate solution fe_function:
 template<int dim>
 Functions::FEFieldFunction<dim> &
-        Step6<dim>::get_fe_function(unsigned int boundary_id, unsigned int cycle)
+        Step6<dim>::get_fe_function(unsigned int boundary_id)
 {
 
     // get other subdomain id
@@ -262,19 +263,19 @@ void Step6<dim>::assemble_system(unsigned int cycle, unsigned int s)
          } else { //s=1, here we use the most recent solution from subdomain0
              VectorTools::interpolate_boundary_values(dof_handler,
                                                       1,
-                                                      get_fe_function(1, cycle),
+                                                      get_fe_function(1),
                                                       boundary_values);
          }
 
     } else { //now all solutionfunction_vectors have at least has one entry that we can retrieve with get_fe_function()
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  1,
-                                                 get_fe_function(1, cycle),
+                                                 get_fe_function(1),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  2,
-                                                 get_fe_function(2, cycle),
+                                                 get_fe_function(2),
                                                  boundary_values);
     }
 
@@ -303,6 +304,9 @@ void Step6<dim>::solve()
     std::unique_ptr<Functions::FEFieldFunction<dim>> pointer =
             std::make_unique<Functions::FEFieldFunction<dim>>(dof_handler, solution);
     solutionfunction_vector.emplace_back (std::move(pointer));
+
+    std::cout << "  max solution value=" << solution.linfty_norm()
+              << std::endl;
 
 }
 
