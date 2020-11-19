@@ -120,7 +120,7 @@ Step6<dim>::Step6(const unsigned int subdomain)
                                    corner_points[2 * subdomain + 1]);
 
     //triangulation.refine_global(1);
-    triangulation.refine_global(2); //refined again to try to debug strange visualizations (mentioned in journal)
+    triangulation.refine_global(2); //one more global refinement fixed sudden deflation in solution visualizations
 
     //set the boundary_id to 2 along gamma2:
     if (subdomain == 0) {
@@ -140,7 +140,8 @@ Step6<dim>::Step6(const unsigned int subdomain)
         }
     }
 
-    setup_system();
+    setup_system(); //actually want to call this for every cycle now that we are refining grids and therefore need to
+                      //distribute dofs, reinitialize solutions and rhs, etc.
 
 
 }
@@ -206,6 +207,11 @@ void Step6<dim>::assemble_system(unsigned int cycle, unsigned int s)
     system_matrix = 0;
     system_rhs = 0;
 
+    /* Need something of this sort here if setup_system is indeed included in the constructor:
+    dof_handler.distribute_dofs(fe);
+    solution.reinit(dof_handler.n_dofs());
+    system_rhs.reinit(dof_handler.n_dofs());
+*/
     const QGauss<dim> quadrature_formula(fe.degree + 1);
 
     FEValues<dim> fe_values(fe,
@@ -338,7 +344,6 @@ void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s) 
 
         GridOut grid_out;
 
-        //std::ofstream output("grid-" + std::to_string(cycle) + ".gnuplot");
         std::ofstream output("grid-" + std::to_string(s*100 + cycle)  +".gnuplot");
 
         GridOutFlags::Gnuplot gnuplot_flags(false, 5);
@@ -354,7 +359,6 @@ void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s) 
         data_out.add_data_vector(solution, "solution");
         data_out.build_patches();
 
-        //std::ofstream output("solution-" + std::to_string(cycle) + ".vtu");
         std::ofstream output("solution-" + std::to_string(s*100 + cycle) + ".vtu");
 
         data_out.write_vtu(output);
@@ -367,7 +371,20 @@ void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s) 
 template <int dim>
 void Step6<dim>::run(const unsigned int cycle, const unsigned int s) {
 
-    //refine_grid(); //incorporate this later
+    //For debugging purposes only:
+    std::cout << "Cycle:  " << cycle << std::endl;
+    std::cout << "Subdomain:  " << s << std::endl;
+
+    std::cout << "   Number of active cells:       "
+              << triangulation.n_active_cells() << std::endl;
+    std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
+              << std::endl;
+
+    refine_grid();
+
+    setup_system();
+
+    std::cout << " After calling refine_grid():" << std::endl;
     std::cout << "   Number of active cells:       "
               << triangulation.n_active_cells() << std::endl;
     std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
@@ -383,11 +400,6 @@ void Step6<dim>::run(const unsigned int cycle, const unsigned int s) {
     solve();
 
     output_results(cycle, s);
-
-        //For debugging purposes only:
-        std::cout << "Cycle:  " << cycle << std::endl;
-        std::cout << "Subdomain:  " << s << std::endl;
-
 
 }
 
