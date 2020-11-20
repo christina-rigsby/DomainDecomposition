@@ -70,7 +70,7 @@ public:
 private:
     void setup_system();
     void assemble_system(const unsigned int cycle, const unsigned int s);
-    Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id);
+    Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id, const unsigned int s);
     void solve();
     void refine_grid();
     void output_results(const unsigned int cycle, const unsigned int s) const;
@@ -113,8 +113,16 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
 {
     //Create separate triangulations for each subdomain:
-    const std::vector<Point<2>> corner_points = {Point<2>(-1, -1), Point<2>(0.25, 1),
-                                                 Point<2>(-0.25, -1), Point<2>(1, 1)};
+// 2 subdomains case:
+    //const std::vector<Point<2>> corner_points = {Point<2>(-1, -1), Point<2>(0.25, 1),
+    //                                             Point<2>(-0.25, -1), Point<2>(1, 1)};
+
+//4 subdomains case:
+    const std::vector<Point<2>> corner_points = {Point<2>(-1, -0.25), Point<2>(0.25, 1),
+                                                 Point<2>(-0.25, -0.25), Point<2>(1, 1),
+                                                 Point<2>(-0.25,-1), Point<2>(1,0.25),
+                                                 Point<2>(-1,-1), Point<2>(0.25,0.25)};
+
 
     GridGenerator::hyper_rectangle(triangulation, corner_points[2 * subdomain],
                                    corner_points[2 * subdomain + 1]);
@@ -122,8 +130,9 @@ Step6<dim>::Step6(const unsigned int subdomain)
     //triangulation.refine_global(1);
     triangulation.refine_global(2); //one more global refinement fixed sudden deflation in solution visualizations
 
+//2 subdomain case
     //set the boundary_id to 2 along gamma2:
-    if (subdomain == 0) {
+   /* if (subdomain == 0) {
         for (const auto &cell : triangulation.cell_iterators())
             for (const auto &face : cell->face_iterators()) {
                 const auto center = face->center();
@@ -139,9 +148,74 @@ Step6<dim>::Step6(const unsigned int subdomain)
                 face->set_boundary_id(1);
         }
     }
+*/
 
-    setup_system(); //actually want to call this for every cycle now that we are refining grids and therefore need to
-                      //distribute dofs, reinitialize solutions and rhs, etc.
+//4 subdomain case:
+
+    //set the boundary_ids of edges of subdomain0
+     if (subdomain == 0) {
+         for (const auto &cell : triangulation.cell_iterators())
+             for (const auto &face : cell->face_iterators()) {
+                 const auto center = face->center();
+
+                 //set boundary_id to 2 along portion of gamma2 that is the right boundary edge of subdomain0
+                 if ((std::fabs(center(0) - (0.25)) < 1e-12))
+                     face->set_boundary_id(2);
+                 
+                 //set boundary_id to 4 along portion of gamma4 that is the bottom boundary edge of subdomain0
+                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12))
+                     face->set_boundary_id(4);
+             }
+
+     //set the boundary_ids of edges of subdomain1
+     } else if (subdomain == 1) {
+         for (const auto &cell : triangulation.cell_iterators())
+             for (const auto &face : cell->face_iterators()) {
+                 const auto center = face->center();
+
+                 //set boundary_id to 1 along portion of gamma1 that is the left boundary edge of subdomain1
+                 if ((std::fabs(center(0) - (-0.25)) < 1e-12))
+                     face->set_boundary_id(1);
+
+                 //set boundary_id to 4 along portion of gamma4 that is the bottom boundary edge of subdomain1
+                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12))
+                     face->set_boundary_id(4);
+             }
+
+     //set the boundary_ids of edges of subdomain2
+     } else if (subdomain == 2) {
+         for (const auto &cell : triangulation.cell_iterators())
+             for (const auto &face : cell->face_iterators()) {
+                 const auto center = face->center();
+
+                 //set boundary_id to 1 along portion of gamma1 that is the left boundary edge of subdomain2
+                 if ((std::fabs(center(0) - (-0.25)) < 1e-12))
+                     face->set_boundary_id(1);
+
+                 //set boundary_id to 3 along portion of gamma3 that is the top boundary edge of subdomain2
+                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12))
+                     face->set_boundary_id(3);
+             }
+
+     //set the boundary_ids of edges of subdomain3
+     } else if (subdomain == 3) {
+         for (const auto &cell : triangulation.cell_iterators())
+             for (const auto &face : cell->face_iterators()) {
+                 const auto center = face->center();
+
+                 //set boundary_id to 2 along portion of gamma2 that is the right boundary edge of subdomain3
+                 if ((std::fabs(center(0) - (0.25)) < 1e-12))
+                     face->set_boundary_id(2);
+
+                 //set boundary_id to 3 along portion of gamma3 that is the top boundary edge of subdomain3
+                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12))
+                     face->set_boundary_id(3);
+         }
+
+     } else
+        Assert (false, ExcInternalError()); // always aborts the program
+
+    setup_system();
 
 
 }
@@ -175,22 +249,73 @@ void Step6<dim>::setup_system()
 
 }
 
+
+
 //Need function to get the appropriate solution fe_function:
 template<int dim>
 Functions::FEFieldFunction<dim> &
-        Step6<dim>::get_fe_function(unsigned int boundary_id)
+        Step6<dim>::get_fe_function(unsigned int boundary_id, unsigned int s)
 {
 
     // get other subdomain id
     types::subdomain_id relevant_subdomain;
 
-    //only handle nonzero boundary_ids for now:
+//2 subdomain case:
+/*
     if (boundary_id == 1){
         relevant_subdomain = 0;
     } else if (boundary_id == 2){
         relevant_subdomain = 1;
     } else
         Assert (false, ExcInternalError()); // always aborts the program
+*/
+
+//4 subdomain case:
+
+    if (s == 0){
+        //subdomain0 takes the solution from subdomain1 as its boundary condition on its right boundary
+        if (boundary_id == 2)
+            relevant_subdomain = 1;
+        //subdomain0 takes the solution from subdomain3 as its boundary condition on its bottom boundary
+        else if (boundary_id == 4)
+            relevant_subdomain = 3;
+        else //outer boundary with boundary_id=0 by default
+            relevant_subdomain = -1;
+
+
+    } else if (s == 1) {
+        if (boundary_id == 1)
+            relevant_subdomain = 0;
+        else if (boundary_id == 4)
+            relevant_subdomain = 2;
+        else //outer boundary with boundary_id=0 by default
+            relevant_subdomain = -1;
+
+
+    } else if (s == 2) {
+        if (boundary_id == 3)
+            relevant_subdomain = 1;
+        else if (boundary_id == 1)
+            relevant_subdomain = 3;
+        else //outer boundary with boundary_id=0 by default
+            relevant_subdomain = -1;
+
+
+    } else if (s == 3) {
+        if (boundary_id == 3)
+            relevant_subdomain = 0;
+        else if (boundary_id == 2)
+            relevant_subdomain = 2;
+        else //outer boundary with boundary_id=0 by default
+            relevant_subdomain = -1;
+
+
+    } else
+        Assert (false, ExcInternalError()); // always aborts the program
+
+    //For debugging:
+    std::cout << "              The BC function for subdomain " << s << " on gamma" << boundary_id <<
+                 " is from subdomain " << relevant_subdomain <<  std::endl;
 
     //For Multiplicative Schwarz, we impose the most recently computed solution from neighboring subdomains as the
     // BC of the current subdomain, so we retrieve the last entry of the appropriate solutionfunction_vector:
@@ -207,11 +332,6 @@ void Step6<dim>::assemble_system(unsigned int cycle, unsigned int s)
     system_matrix = 0;
     system_rhs = 0;
 
-    /* Need something of this sort here if setup_system is indeed included in the constructor:
-    dof_handler.distribute_dofs(fe);
-    solution.reinit(dof_handler.n_dofs());
-    system_rhs.reinit(dof_handler.n_dofs());
-*/
     const QGauss<dim> quadrature_formula(fe.degree + 1);
 
     FEValues<dim> fe_values(fe,
@@ -257,6 +377,8 @@ void Step6<dim>::assemble_system(unsigned int cycle, unsigned int s)
                                              Functions::ZeroFunction<dim>(),
                                              boundary_values);
 
+//2 subdomain case:
+/*
     if (cycle == 1){
          if (s==0) { //solutionfunction_vector of subdomain1 is empty!
              // We can work around the need for this if-else block later by having the first entry of
@@ -283,6 +405,136 @@ void Step6<dim>::assemble_system(unsigned int cycle, unsigned int s)
                                                  2,
                                                  get_fe_function(2),
                                                  boundary_values);
+    }
+*/
+
+//4 subdomain case:
+    if (cycle == 1){
+        if (s==0) { //solutionfunction_vector of all subdomains are empty!
+
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     2,
+                                                     Functions::ZeroFunction<dim>(), //solution for subdomain1 not yet computed
+                                                     boundary_values);
+
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     4,
+                                                     Functions::ZeroFunction<dim>(), //solution for subdomain3 not yet computed
+                                                     boundary_values);
+
+
+        } else if (s == 1) {
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     1,
+                                                     get_fe_function(1, s),
+                                                     boundary_values);
+
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     4,
+                                                     Functions::ZeroFunction<dim>(), //solution for subdomain2 not yet computed
+                                                     boundary_values);
+
+        } else if (s == 2) {
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     3,
+                                                     get_fe_function(3, s),
+                                                     boundary_values);
+
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     1,
+                                                     Functions::ZeroFunction<dim>(), //solution for subdomain3 not yet computed
+                                                     boundary_values);
+        } else if (s == 3) {
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     2,
+                                                     get_fe_function(2, s),
+                                                     boundary_values);
+
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     3,
+                                                     get_fe_function(3, s),
+                                                     boundary_values);
+
+        } else
+            Assert (false, ExcInternalError()); // always aborts the program
+
+    } else { //now all solutionfunction_vectors have at least has one entry that we can retrieve with get_fe_function()
+        if (s == 0){
+
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     2,
+                                                     get_fe_function(2, s),
+                                                     boundary_values);
+
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     4,
+                                                     get_fe_function(4, s),
+                                                     boundary_values);
+
+
+        } else if (s == 1){
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     1,
+                                                     get_fe_function(1, s),
+                                                     boundary_values);
+
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     4,
+                                                     get_fe_function(4, s),
+                                                     boundary_values);
+
+        } else if (s == 2){
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     1,
+                                                     get_fe_function(1, s),
+                                                     boundary_values);
+
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     3,
+                                                     get_fe_function(3, s),
+                                                     boundary_values);
+
+        } else if (s == 3){
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     2,
+                                                     get_fe_function(2, s),
+                                                     boundary_values);
+
+            VectorTools::interpolate_boundary_values(dof_handler,
+                                                     3,
+                                                     get_fe_function(3, s),
+                                                     boundary_values);
+
+        } else
+            Assert (false, ExcInternalError()); // always aborts the program
+
+        //Want to modify interpolate_boundary_values() slightly so that it checks if the given boundary_id
+        // is present on a boundary of the current subdomain:
+        //      if so: apply the given boundary_function
+        //      if not: do nothing
+        // so that we can run the following, without need to check which subdomain we are on:
+
+        /*
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 1,
+                                                 get_fe_function(1, s),
+                                                 boundary_values);
+
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 2,
+                                                 get_fe_function(2, s),
+                                                 boundary_values);
+
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 3,
+                                                 get_fe_function(3, s),
+                                                 boundary_values);
+
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 4,
+                                                 get_fe_function(4, s),
+                                                 boundary_values);
+    */
     }
 
 
@@ -411,16 +663,23 @@ int main()
     {
 
         std::vector<std::shared_ptr<Step6<2>>> subdomain_problems;
+
         subdomain_problems.push_back (std::make_shared<Step6<2>> (0));
         subdomain_problems.push_back (std::make_shared<Step6<2>> (1));
+        subdomain_problems.push_back (std::make_shared<Step6<2>> (2));
+        subdomain_problems.push_back (std::make_shared<Step6<2>> (3));
 
-        // Tell each of the objects representing one subdomain each about
-        // the objects representing all of the other subdomains
-        for (unsigned int s=0; s<subdomain_problems.size(); ++s)
+
+        for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
+
+            // Tell each of the objects representing one subdomain each about the objects representing all
+            // of the other subdomains:
             subdomain_problems[s] -> set_all_subdomain_objects(subdomain_problems);
 
+        }
 
-        for (unsigned int cycle = 1; cycle < 9; ++cycle)
+
+        for (unsigned int cycle=1; cycle<9; ++cycle)
             for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
                 subdomain_problems[s] -> run(cycle, s);
             }
