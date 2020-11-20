@@ -69,7 +69,7 @@ public:
 
 private:
     void setup_system();
-    void assemble_system(const unsigned int cycle, const unsigned int s);
+    void assemble_system(const unsigned int s);
     Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id, const unsigned int s);
     void solve();
     void refine_grid();
@@ -88,7 +88,7 @@ private:
     SparseMatrix<double> system_matrix;
     SparsityPattern      sparsity_pattern;
 
-    Vector<double> solution;
+    Vector<double> solution; //initialized with default value of 0
     Vector<double> system_rhs;
 
 };
@@ -112,10 +112,16 @@ Step6<dim>::Step6(const unsigned int subdomain)
         dof_handler(triangulation)
 
 {
-    //Create separate triangulations for each subdomain:
+
+//Create separate triangulations for each subdomain: --------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------------------------------------------------
 // 2 subdomains case:
     //const std::vector<Point<2>> corner_points = {Point<2>(-1, -1), Point<2>(0.25, 1),
     //                                             Point<2>(-0.25, -1), Point<2>(1, 1)};
+
+// ----------------------------------------------------------------------------------------------------------------
 
 //4 subdomains case:
     const std::vector<Point<2>> corner_points = {Point<2>(-1, -0.25), Point<2>(0.25, 1),
@@ -130,6 +136,12 @@ Step6<dim>::Step6(const unsigned int subdomain)
     //triangulation.refine_global(1);
     triangulation.refine_global(2); //one more global refinement fixed sudden deflation in solution visualizations
 
+
+
+// Set boundary_ids: ----------------------------------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------------------------------------------------
 //2 subdomain case
     //set the boundary_id to 2 along gamma2:
    /* if (subdomain == 0) {
@@ -149,6 +161,7 @@ Step6<dim>::Step6(const unsigned int subdomain)
         }
     }
 */
+// ----------------------------------------------------------------------------------------------------------------
 
 //4 subdomain case:
 
@@ -215,10 +228,20 @@ Step6<dim>::Step6(const unsigned int subdomain)
      } else
         Assert (false, ExcInternalError()); // always aborts the program
 
-    setup_system();
 
+    setup_system(); //makes solution of the right size (n_dofs) and distributes dofs
+                    // so after setup_system(), we can make a FEFieldFunction (using solution and dof_handler)
+                    // equivalent to the zero function (because solution is iniitalized with a value of zero by default)
+                    // and make this FEFieldfunction the first entry of each solutionfunction_vector:
+
+//Make the first element in each solutionfunction_vector the zero_function:
+    std::unique_ptr<Functions::FEFieldFunction<dim>> zero_function =
+            std::make_unique<Functions::FEFieldFunction<dim>>(dof_handler, solution);
+    solutionfunction_vector.emplace_back (std::move(zero_function));
 
 }
+
+
 
 
 template <int dim>
@@ -251,6 +274,8 @@ void Step6<dim>::setup_system()
 
 
 
+
+
 //Need function to get the appropriate solution fe_function:
 template<int dim>
 Functions::FEFieldFunction<dim> &
@@ -260,7 +285,8 @@ Functions::FEFieldFunction<dim> &
     // get other subdomain id
     types::subdomain_id relevant_subdomain;
 
-//2 subdomain case:
+// ----------------------------------------------------------------------------------------------------------------
+// 2 subdomain case:
 /*
     if (boundary_id == 1){
         relevant_subdomain = 0;
@@ -269,6 +295,9 @@ Functions::FEFieldFunction<dim> &
     } else
         Assert (false, ExcInternalError()); // always aborts the program
 */
+
+// ----------------------------------------------------------------------------------------------------------------
+
 
 //4 subdomain case:
 
@@ -326,8 +355,11 @@ Functions::FEFieldFunction<dim> &
 
 }
 
+
+
+
 template <int dim>
-void Step6<dim>::assemble_system(unsigned int cycle, unsigned int s)
+void Step6<dim>::assemble_system(unsigned int s)
 {
     system_matrix = 0;
     system_rhs = 0;
@@ -377,149 +409,65 @@ void Step6<dim>::assemble_system(unsigned int cycle, unsigned int s)
                                              Functions::ZeroFunction<dim>(),
                                              boundary_values);
 
+// ----------------------------------------------------------------------------------------------------------------
 //2 subdomain case:
 /*
-    if (cycle == 1){
-         if (s==0) { //solutionfunction_vector of subdomain1 is empty!
-             // We can work around the need for this if-else block later by having the first entry of
-             // each solutionfunction_vector be the ZeroFunction of type FEFieldFunction...
-             VectorTools::interpolate_boundary_values(dof_handler,
-                                                      2,
-                                                      Functions::ZeroFunction<dim>(),
-                                                      boundary_values);
 
-         } else { //s=1, here we use the most recent solution from subdomain0
-             VectorTools::interpolate_boundary_values(dof_handler,
-                                                      1,
-                                                      get_fe_function(1),
-                                                      boundary_values);
-         }
+     if (s==0) {
+         VectorTools::interpolate_boundary_values(dof_handler,
+                                                  2,
+                                                  get_fe_function(1, s),
+                                                  boundary_values);
 
-    } else { //now all solutionfunction_vectors have at least has one entry that we can retrieve with get_fe_function()
-        VectorTools::interpolate_boundary_values(dof_handler,
-                                                 1,
-                                                 get_fe_function(1),
-                                                 boundary_values);
+     } else { //s=1
+         VectorTools::interpolate_boundary_values(dof_handler,
+                                                  1,
+                                                  get_fe_function(1, s),
+                                                  boundary_values);
+     }
+
+*/
+
+// ----------------------------------------------------------------------------------------------------------------
+
+//4 subdomain case:
+//No longer need to check cycle:
+    if (s == 0){
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  2,
-                                                 get_fe_function(2),
+                                                 get_fe_function(2, s),
                                                  boundary_values);
-    }
-*/
 
-//4 subdomain case:
-    if (cycle == 1){
-        if (s==0) { //solutionfunction_vector of all subdomains are empty!
-
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     2,
-                                                     Functions::ZeroFunction<dim>(), //solution for subdomain1 not yet computed
-                                                     boundary_values);
-
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     4,
-                                                     Functions::ZeroFunction<dim>(), //solution for subdomain3 not yet computed
-                                                     boundary_values);
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 4,
+                                                 get_fe_function(4, s),
+                                                 boundary_values);
 
 
-        } else if (s == 1) {
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     1,
-                                                     get_fe_function(1, s),
-                                                     boundary_values);
-
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     4,
-                                                     Functions::ZeroFunction<dim>(), //solution for subdomain2 not yet computed
-                                                     boundary_values);
-
-        } else if (s == 2) {
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     3,
-                                                     get_fe_function(3, s),
-                                                     boundary_values);
-
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     1,
-                                                     Functions::ZeroFunction<dim>(), //solution for subdomain3 not yet computed
-                                                     boundary_values);
-        } else if (s == 3) {
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     2,
-                                                     get_fe_function(2, s),
-                                                     boundary_values);
-
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     3,
-                                                     get_fe_function(3, s),
-                                                     boundary_values);
-
-        } else
-            Assert (false, ExcInternalError()); // always aborts the program
-
-    } else { //now all solutionfunction_vectors have at least has one entry that we can retrieve with get_fe_function()
-        if (s == 0){
-
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     2,
-                                                     get_fe_function(2, s),
-                                                     boundary_values);
-
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     4,
-                                                     get_fe_function(4, s),
-                                                     boundary_values);
-
-
-        } else if (s == 1){
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     1,
-                                                     get_fe_function(1, s),
-                                                     boundary_values);
-
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     4,
-                                                     get_fe_function(4, s),
-                                                     boundary_values);
-
-        } else if (s == 2){
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     1,
-                                                     get_fe_function(1, s),
-                                                     boundary_values);
-
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     3,
-                                                     get_fe_function(3, s),
-                                                     boundary_values);
-
-        } else if (s == 3){
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     2,
-                                                     get_fe_function(2, s),
-                                                     boundary_values);
-
-            VectorTools::interpolate_boundary_values(dof_handler,
-                                                     3,
-                                                     get_fe_function(3, s),
-                                                     boundary_values);
-
-        } else
-            Assert (false, ExcInternalError()); // always aborts the program
-
-        //Want to modify interpolate_boundary_values() slightly so that it checks if the given boundary_id
-        // is present on a boundary of the current subdomain:
-        //      if so: apply the given boundary_function
-        //      if not: do nothing
-        // so that we can run the following, without need to check which subdomain we are on:
-
-        /*
+    } else if (s == 1){
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  1,
                                                  get_fe_function(1, s),
                                                  boundary_values);
 
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 4,
+                                                 get_fe_function(4, s),
+                                                 boundary_values);
+
+    } else if (s == 2){
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 1,
+                                                 get_fe_function(1, s),
+                                                 boundary_values);
+
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 3,
+                                                 get_fe_function(3, s),
+                                                 boundary_values);
+
+    } else if (s == 3){
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  2,
                                                  get_fe_function(2, s),
@@ -530,12 +478,38 @@ void Step6<dim>::assemble_system(unsigned int cycle, unsigned int s)
                                                  get_fe_function(3, s),
                                                  boundary_values);
 
-        VectorTools::interpolate_boundary_values(dof_handler,
-                                                 4,
-                                                 get_fe_function(4, s),
-                                                 boundary_values);
-    */
-    }
+    } else
+    Assert (false, ExcInternalError()); // always aborts the program
+
+    //Want to modify interpolate_boundary_values() slightly so that it checks if the given boundary_id
+    // is present on a boundary of the current subdomain:
+    //      if so: apply the given boundary_function
+    //      if not: do nothing
+    // so that we can run the following, without need to check which subdomain we are on:
+
+
+/*
+
+    VectorTools::interpolate_boundary_values(dof_handler,
+                                             1,
+                                             get_fe_function(1, s),
+                                             boundary_values);
+
+    VectorTools::interpolate_boundary_values(dof_handler,
+                                             2,
+                                             get_fe_function(2, s),
+                                             boundary_values);
+
+    VectorTools::interpolate_boundary_values(dof_handler,
+                                             3,
+                                             get_fe_function(3, s),
+                                             boundary_values);
+
+    VectorTools::interpolate_boundary_values(dof_handler,
+                                             4,
+                                             get_fe_function(4, s),
+                                             boundary_values);
+*/
 
 
     MatrixTools::apply_boundary_values(boundary_values,
@@ -545,6 +519,7 @@ void Step6<dim>::assemble_system(unsigned int cycle, unsigned int s)
 
 
 }
+
 
 
 
@@ -570,6 +545,7 @@ void Step6<dim>::solve()
 
 
 
+
 template <int dim>
 void Step6<dim>::refine_grid()
 {
@@ -586,6 +562,7 @@ void Step6<dim>::refine_grid()
     triangulation.execute_coarsening_and_refinement();
 
 }
+
 
 
 
@@ -620,6 +597,7 @@ void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s) 
 
 
 
+
 template <int dim>
 void Step6<dim>::run(const unsigned int cycle, const unsigned int s) {
 
@@ -642,7 +620,7 @@ void Step6<dim>::run(const unsigned int cycle, const unsigned int s) {
     std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
               << std::endl;
 
-    assemble_system(cycle, s);
+    assemble_system(s);
 
         //For debugging purposes only:
         std::cout << "   Number of active cells:       "
@@ -654,6 +632,7 @@ void Step6<dim>::run(const unsigned int cycle, const unsigned int s) {
     output_results(cycle, s);
 
 }
+
 
 
 
