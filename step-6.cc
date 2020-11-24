@@ -65,6 +65,9 @@ public:
 
     std::vector<std::unique_ptr<Functions::FEFieldFunction<dim>>> solutionfunction_vector;
 
+    //const std::vector<Point<2>> corner_points;
+
+
 
 
 private:
@@ -171,13 +174,34 @@ Step6<dim>::Step6(const unsigned int subdomain)
              for (const auto &face : cell->face_iterators()) {
                  const auto center = face->center();
 
-                 //set boundary_id to 2 along portion of gamma2 that is the right boundary edge of subdomain0
-                 if ((std::fabs(center(0) - (0.25)) < 1e-12))
+             //Right edge:
+
+                 //set boundary_id to 2 along the portion of gamma2 that makes up part of the right
+                 // boundary edge of subdomain0
+                 if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
+                     (std::fabs(center(dim - 1) > 0.25)))
                      face->set_boundary_id(2);
-                 
-                 //set boundary_id to 4 along portion of gamma4 that is the bottom boundary edge of subdomain0
-                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12))
+
+                 //set boundary_id to 6 along gamma6, the remaining portion of subdomain0's right edge
+                 if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
+                     (std::fabs(center(dim - 1) <= 0.25)))
+                     face->set_boundary_id(6);
+
+             //Bottom edge:
+
+                 //set boundary_id to 4 along the portion of gamma4 that makes up part of the bottom
+                 // boundary edge of subdomain0
+                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
+                     (std::fabs(center(0) < -0.25)))
                      face->set_boundary_id(4);
+
+                 //set boundary_id to 8 along gamma8, the remaining portion of subdomain0's bottom edge
+                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
+                     (std::fabs(center(0) >= -0.25)))
+                     face->set_boundary_id(8);
+
+             //Remaining edges have boundary_ids of 0 by default.
+
              }
 
      //set the boundary_ids of edges of subdomain1
@@ -186,13 +210,34 @@ Step6<dim>::Step6(const unsigned int subdomain)
              for (const auto &face : cell->face_iterators()) {
                  const auto center = face->center();
 
-                 //set boundary_id to 1 along portion of gamma1 that is the left boundary edge of subdomain1
-                 if ((std::fabs(center(0) - (-0.25)) < 1e-12))
+             //Left edge:
+
+                 //set boundary_id to 1 along portion of gamma1 that makes up part of the left
+                 // boundary edge of subdomain1
+                 if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
+                     (std::fabs(center(dim - 1) > 0.25)))
                      face->set_boundary_id(1);
 
-                 //set boundary_id to 4 along portion of gamma4 that is the bottom boundary edge of subdomain1
-                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12))
+                 //set boundary_id to 5 along gamma5, the remaining portion of subdomain1's left edge
+                 if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
+                     (std::fabs(center(dim - 1) <= 0.25)))
+                     face->set_boundary_id(5);
+
+             //Bottom edge:
+
+                 //set boundary_id to 4 along portion of gamma4 that makes up part of the bottom
+                 // boundary edge of subdomain1
+                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
+                     (std::fabs(center(0) > 0.25)))
                      face->set_boundary_id(4);
+
+                 //set boundary_id to 8 along gamma8, the remaining portion of subdomain1's bottom edge
+                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
+                     (std::fabs(center(0) <= 0.25)))
+                     face->set_boundary_id(8);
+
+             //Remaining edges have boundary_ids of 0 by default.
+
              }
 
      //set the boundary_ids of edges of subdomain2
@@ -201,13 +246,34 @@ Step6<dim>::Step6(const unsigned int subdomain)
              for (const auto &face : cell->face_iterators()) {
                  const auto center = face->center();
 
-                 //set boundary_id to 1 along portion of gamma1 that is the left boundary edge of subdomain2
-                 if ((std::fabs(center(0) - (-0.25)) < 1e-12))
+             //Left edge:
+
+                 //set boundary_id to 1 along portion of gamma1 that makes up part of the left
+                 // boundary edge of subdomain2
+                 if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
+                     (std::fabs(center(dim - 1) < -0.25)))
                      face->set_boundary_id(1);
 
-                 //set boundary_id to 3 along portion of gamma3 that is the top boundary edge of subdomain2
-                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12))
+                 //set boundary_id to 5 along gamma5, the remaining portion of subdomain2's left edge
+                 if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
+                     (std::fabs(center(dim - 1) >= -0.25)))
+                     face->set_boundary_id(5);
+
+             //Top edge:
+
+                 //set boundary_id to 3 along portion of gamma3 that makes up part of the top
+                 // boundary edge of subdomain2
+                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
+                     (std::fabs(center(0) > 0.25)))
                      face->set_boundary_id(3);
+
+                 //set boundary_id to 7 along gamma7, the remaining portion of subdomain2's top edge
+                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
+                     (std::fabs(center(0) <= 0.25)))
+                     face->set_boundary_id(7);
+
+             //Remaining edges have boundary_ids of 0 by default.
+
              }
 
      //set the boundary_ids of edges of subdomain3
@@ -216,13 +282,34 @@ Step6<dim>::Step6(const unsigned int subdomain)
              for (const auto &face : cell->face_iterators()) {
                  const auto center = face->center();
 
-                 //set boundary_id to 2 along portion of gamma2 that is the right boundary edge of subdomain3
-                 if ((std::fabs(center(0) - (0.25)) < 1e-12))
+             //Right edge:
+
+                 //set boundary_id to 2 along portion of gamma2 that makes up part of the right
+                 // boundary edge of subdomain3
+                 if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
+                     (std::fabs(center(dim - 1) < -0.25)))
                      face->set_boundary_id(2);
 
-                 //set boundary_id to 3 along portion of gamma3 that is the top boundary edge of subdomain3
-                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12))
+                 //set boundary_id to 6 along gamma6, the remaining portion of subdomain3's right edge
+                 if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
+                     (std::fabs(center(dim - 1) >= -0.25)))
+                     face->set_boundary_id(6);
+
+             //Top edge:
+
+                 //set boundary_id to 3 along portion of gamma3 that makes up part of the top
+                 // boundary edge of subdomain3
+                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
+                     (std::fabs(center(0) < -0.25)))
                      face->set_boundary_id(3);
+
+                 //set boundary_id to 7 along gamma7, the remaining portion of subdomain3's top edge
+                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
+                     (std::fabs(center(0) >= -0.25)))
+                     face->set_boundary_id(7);
+
+             //Remaining edges have boundary_ids of 0 by default.
+
          }
 
      } else
@@ -275,7 +362,6 @@ void Step6<dim>::setup_system()
 
 
 
-
 //Need function to get the appropriate solution fe_function:
 template<int dim>
 Functions::FEFieldFunction<dim> &
@@ -302,40 +388,57 @@ Functions::FEFieldFunction<dim> &
 //4 subdomain case:
 
     if (s == 0){
-        //subdomain0 takes the solution from subdomain1 as its boundary condition on its right boundary
         if (boundary_id == 2)
             relevant_subdomain = 1;
-        //subdomain0 takes the solution from subdomain3 as its boundary condition on its bottom boundary
+
+        //else if (boundary_id == 6 || boundary_id == 8)
+        //    relevant_subdomain = 2;
+        else if (boundary_id == 6)
+            relevant_subdomain = 2;
+
+        else if (boundary_id == 8)
+            relevant_subdomain = 2;
+
         else if (boundary_id == 4)
             relevant_subdomain = 3;
-        else //outer boundary with boundary_id=0 by default
+
+        else //boundary_id == 0
             relevant_subdomain = -1;
 
 
     } else if (s == 1) {
         if (boundary_id == 1)
             relevant_subdomain = 0;
+
+        else if (boundary_id == 5 || boundary_id == 8)
+            relevant_subdomain = 3;
+
         else if (boundary_id == 4)
             relevant_subdomain = 2;
-        else //outer boundary with boundary_id=0 by default
+
+        else //boundary_id == 0
             relevant_subdomain = -1;
 
 
     } else if (s == 2) {
         if (boundary_id == 3)
             relevant_subdomain = 1;
+        else if (boundary_id == 5 || boundary_id == 7)
+            relevant_subdomain = 0;
         else if (boundary_id == 1)
             relevant_subdomain = 3;
-        else //outer boundary with boundary_id=0 by default
+        else //boundary_id == 0
             relevant_subdomain = -1;
 
 
     } else if (s == 3) {
         if (boundary_id == 3)
             relevant_subdomain = 0;
+        else if (boundary_id == 6 || boundary_id == 7)
+            relevant_subdomain = 1;
         else if (boundary_id == 2)
             relevant_subdomain = 2;
-        else //outer boundary with boundary_id=0 by default
+        else //boundary_id == 0
             relevant_subdomain = -1;
 
 
@@ -404,6 +507,7 @@ void Step6<dim>::assemble_system(unsigned int s)
 
     std::map<types::global_dof_index, double> boundary_values;
 
+    //Impose boundary condition on edges with boundary_id of 0
     VectorTools::interpolate_boundary_values(dof_handler,
                                              0,
                                              Functions::ZeroFunction<dim>(),
@@ -431,7 +535,8 @@ void Step6<dim>::assemble_system(unsigned int s)
 // ----------------------------------------------------------------------------------------------------------------
 
 //4 subdomain case:
-//No longer need to check cycle:
+
+    //Impose boundary conditions on edges of subdomain0 with nonzero boundary_ids
     if (s == 0){
 
         VectorTools::interpolate_boundary_values(dof_handler,
@@ -444,8 +549,22 @@ void Step6<dim>::assemble_system(unsigned int s)
                                                  get_fe_function(4, s),
                                                  boundary_values);
 
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 6,
+                                                 get_fe_function(6, s),
+                                                 boundary_values);
 
+        std::cout << "we are at least moving on from imposing a condition on gamma6..." << std::endl;
+
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 8,
+                                                 get_fe_function(8, s),
+                                                 boundary_values);
+
+
+    //Impose boundary conditions on edges of subdomain1 with nonzero boundary_ids
     } else if (s == 1){
+
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  1,
                                                  get_fe_function(1, s),
@@ -456,6 +575,17 @@ void Step6<dim>::assemble_system(unsigned int s)
                                                  get_fe_function(4, s),
                                                  boundary_values);
 
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 5,
+                                                 get_fe_function(5, s),
+                                                 boundary_values);
+
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 8,
+                                                 get_fe_function(8, s),
+                                                 boundary_values);
+
+    //Impose boundary conditions on edges of subdomain2 with nonzero boundary_ids
     } else if (s == 2){
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  1,
@@ -467,6 +597,16 @@ void Step6<dim>::assemble_system(unsigned int s)
                                                  get_fe_function(3, s),
                                                  boundary_values);
 
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 5,
+                                                 get_fe_function(5, s),
+                                                 boundary_values);
+
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 7,
+                                                 get_fe_function(7, s),
+                                                 boundary_values);
+
     } else if (s == 3){
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  2,
@@ -476,6 +616,16 @@ void Step6<dim>::assemble_system(unsigned int s)
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  3,
                                                  get_fe_function(3, s),
+                                                 boundary_values);
+
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 6,
+                                                 get_fe_function(6, s),
+                                                 boundary_values);
+
+        VectorTools::interpolate_boundary_values(dof_handler,
+                                                 7,
+                                                 get_fe_function(7, s),
                                                  boundary_values);
 
     } else
@@ -509,6 +659,27 @@ void Step6<dim>::assemble_system(unsigned int s)
                                              4,
                                              get_fe_function(4, s),
                                              boundary_values);
+
+    VectorTools::interpolate_boundary_values(dof_handler,
+                                             5,
+                                             get_fe_function(5, s),
+                                             boundary_values);
+
+    VectorTools::interpolate_boundary_values(dof_handler,
+                                             6,
+                                             get_fe_function(6, s),
+                                             boundary_values);
+    VectorTools::interpolate_boundary_values(dof_handler,
+                                             7,
+                                             get_fe_function(7, s),
+                                             boundary_values);
+
+    VectorTools::interpolate_boundary_values(dof_handler,
+                                             8,
+                                             get_fe_function(8, s),
+                                             boundary_values);
+
+    ... or better, with a loop going through all nonzero boundary_id values
 */
 
 
@@ -561,6 +732,7 @@ void Step6<dim>::refine_grid()
                                                     0.03);
     triangulation.execute_coarsening_and_refinement();
 
+
 }
 
 
@@ -610,7 +782,7 @@ void Step6<dim>::run(const unsigned int cycle, const unsigned int s) {
     std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
               << std::endl;
 
-    refine_grid();
+    //refine_grid();
 
     setup_system();
 
@@ -647,18 +819,24 @@ int main()
         subdomain_problems.push_back (std::make_shared<Step6<2>> (1));
         subdomain_problems.push_back (std::make_shared<Step6<2>> (2));
         subdomain_problems.push_back (std::make_shared<Step6<2>> (3));
+        //Want to do this in a loop instead:
+
+        /*
+        for(unsigned int s=0; s<0.5*corner_points.size(); ++s){ //does not recognize corner_points
+            subdomain_problems.push_back (std::make_shared<Step6<2>> (s));
+        }
+        */
 
 
+
+        // Tell each of the objects representing one subdomain each about the objects representing all of the
+        // other subdomains:
         for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
-
-            // Tell each of the objects representing one subdomain each about the objects representing all
-            // of the other subdomains:
             subdomain_problems[s] -> set_all_subdomain_objects(subdomain_problems);
-
         }
 
 
-        for (unsigned int cycle=1; cycle<9; ++cycle)
+        for (unsigned int cycle=1; cycle<8; ++cycle) //only worked for 11 cycles with refinement
             for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
                 subdomain_problems[s] -> run(cycle, s);
             }
