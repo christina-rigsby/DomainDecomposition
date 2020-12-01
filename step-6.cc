@@ -127,17 +127,16 @@ Step6<dim>::Step6(const unsigned int subdomain)
 // ----------------------------------------------------------------------------------------------------------------
 
 //4 subdomains case:
-    const std::vector<Point<2>> corner_points = {Point<2>(-1, -0.25), Point<2>(0.25, 1),
-                                                 Point<2>(-0.25, -0.25), Point<2>(1, 1),
-                                                 Point<2>(-0.25,-1), Point<2>(1,0.25),
-                                                 Point<2>(-1,-1), Point<2>(0.25,0.25)};
+    const std::vector<Point<2>> corner_points = {Point<2>(0, 0.75), Point<2>(1, 1.75),
+                                                 Point<2>(0.75, 0.75), Point<2>(1.75, 1.75),
+                                                 Point<2>(0.75,0), Point<2>(1.75,1),
+                                                 Point<2>(0,0), Point<2>(1,1)};
 
 
     GridGenerator::hyper_rectangle(triangulation, corner_points[2 * subdomain],
                                    corner_points[2 * subdomain + 1]);
 
-    //triangulation.refine_global(1);
-    triangulation.refine_global(2); //one more global refinement fixed sudden deflation in solution visualizations
+    triangulation.refine_global(2);
 
 
 
@@ -178,31 +177,43 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
                  //set boundary_id to 2 along the portion of gamma2 that makes up part of the right
                  // boundary edge of subdomain0
-                 if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
-                     (center(dim - 1) > 0.25))
+
+                 //if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
+                 // The center of a cell will not be within 1e-12 of its bounding value! The cells are bigger than this!
+                 // Because of how our subdomains are constructed and because we initially refine their triangulation
+                 // twice, each cell is a 0.25x0.25 square. Therefore, the center of a cell can only be within 0.25/2
+                 // or 0.125 from any bounding x or y value.
+                 // To check that we are on a cell adjacent to an edge gamma, it is therefore sufficient to check that
+                 // the center is strictly within 0.25 of this edge's defining x or y value.
+                 // This value depends entirely on how much refinement is done initially.
+
+                 if ((std::fabs(center(0) - (1)) < 1e-12) && // I don't understand why '< 1e-12 works', thoughts above...
+                         (center(dim - 1) > 1))
                      face->set_boundary_id(2);
 
                  //set boundary_id to 6 along gamma6, the remaining portion of subdomain0's right edge
-                 if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
-                     (center(dim - 1) <= 0.25))
+                 if ((std::fabs(center(0) - (1)) < 1e-12) &&
+                     (center(dim - 1) <= 1))
                      face->set_boundary_id(6);
 
              //Bottom edge:
 
                  //set boundary_id to 4 along the portion of gamma4 that makes up part of the bottom
                  // boundary edge of subdomain0
-                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
-                     (center(0) < -0.25))
+                 if ((std::fabs(center(dim - 1) - (0.75)) < 1e-12) &&
+                     (center(0) < 0.75))
                      face->set_boundary_id(4);
 
                  //set boundary_id to 8 along gamma8, the remaining portion of subdomain0's bottom edge
-                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
-                     (center(0) >= -0.25))
+                 if ((std::fabs(center(dim - 1) - (0.75)) < 1e-12) &&
+                     (center(0) >= 0.75))
                      face->set_boundary_id(8);
 
              //Remaining edges have boundary_ids of 0 by default.
 
              }
+
+         std::cout << "              Properly set boundary_ids of subdomain 0 " <<  std::endl;
 
      //set the boundary_ids of edges of subdomain1
      } else if (subdomain == 1) {
@@ -214,26 +225,26 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
                  //set boundary_id to 1 along portion of gamma1 that makes up part of the left
                  // boundary edge of subdomain1
-                 if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
-                     (center(dim - 1) > 0.25))
+                 if ((std::fabs(center(0) - (0.75)) < 1e-12) &&
+                     (center(dim - 1) > 1))
                      face->set_boundary_id(1);
 
                  //set boundary_id to 5 along gamma5, the remaining portion of subdomain1's left edge
-                 if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
-                     (center(dim - 1) <= 0.25))
+                 if ((std::fabs(center(0) - (0.75)) < 1e-12) &&
+                     (center(dim - 1) <= 1))
                      face->set_boundary_id(5);
 
              //Bottom edge:
 
                  //set boundary_id to 4 along portion of gamma4 that makes up part of the bottom
                  // boundary edge of subdomain1
-                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
-                     (center(0) > 0.25))
+                 if ((std::fabs(center(dim - 1) - (0.75)) < 1e-12) &&
+                     (center(0) > 1))
                      face->set_boundary_id(4);
 
                  //set boundary_id to 8 along gamma8, the remaining portion of subdomain1's bottom edge
-                 if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
-                     (center(0) <= 0.25))
+                 if ((std::fabs(center(dim - 1) - (0.75)) < 1e-12) &&
+                     (center(0) <= 1))
                      face->set_boundary_id(8);
 
              //Remaining edges have boundary_ids of 0 by default.
@@ -250,26 +261,26 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
                  //set boundary_id to 1 along portion of gamma1 that makes up part of the left
                  // boundary edge of subdomain2
-                 if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
-                     (center(dim - 1) < -0.25))
+                 if ((std::fabs(center(0) - (0.75)) < 1e-12) &&
+                     (center(dim - 1) < 0.75))
                      face->set_boundary_id(1);
 
                  //set boundary_id to 5 along gamma5, the remaining portion of subdomain2's left edge
-                 if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
-                     (center(dim - 1) >= -0.25))
+                 if ((std::fabs(center(0) - (0.75)) < 1e-12) &&
+                     (center(dim - 1) >= 0.75))
                      face->set_boundary_id(5);
 
              //Top edge:
 
                  //set boundary_id to 3 along portion of gamma3 that makes up part of the top
                  // boundary edge of subdomain2
-                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
-                     (center(0) > 0.25))
+                 if ((std::fabs(center(dim - 1) - (1)) < 1e-12) &&
+                     (center(0) > 1))
                      face->set_boundary_id(3);
 
                  //set boundary_id to 7 along gamma7, the remaining portion of subdomain2's top edge
-                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
-                     (center(0) <= 0.25))
+                 if ((std::fabs(center(dim - 1) - (1)) < 1e-12) &&
+                     (center(0) <= 1))
                      face->set_boundary_id(7);
 
              //Remaining edges have boundary_ids of 0 by default.
@@ -286,26 +297,26 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
                  //set boundary_id to 2 along portion of gamma2 that makes up part of the right
                  // boundary edge of subdomain3
-                 if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
-                     (center(dim - 1) < -0.25))
+                 if ((std::fabs(center(0) - (1)) < 1e-12) &&
+                     (center(dim - 1) < 0.75))
                      face->set_boundary_id(2);
 
                  //set boundary_id to 6 along gamma6, the remaining portion of subdomain3's right edge
-                 if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
-                     (center(dim - 1) >= -0.25))
+                 if ((std::fabs(center(0) - (1)) < 1e-12) &&
+                     (center(dim - 1) >= 0.75))
                      face->set_boundary_id(6);
 
              //Top edge:
 
                  //set boundary_id to 3 along portion of gamma3 that makes up part of the top
                  // boundary edge of subdomain3
-                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
-                     (center(0) < -0.25))
+                 if ((std::fabs(center(dim - 1) - (1)) < 1e-12) &&
+                     (center(0) < 0.75))
                      face->set_boundary_id(3);
 
                  //set boundary_id to 7 along gamma7, the remaining portion of subdomain3's top edge
-                 if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
-                     (center(0) >= -0.25))
+                 if ((std::fabs(center(dim - 1) - (1)) < 1e-12) &&
+                     (center(0) >= 0.75))
                      face->set_boundary_id(7);
 
              //Remaining edges have boundary_ids of 0 by default.
@@ -573,13 +584,11 @@ void Step6<dim>::assemble_system(unsigned int s)
                                                  4,
                                                  get_fe_function(4, s),
                                                  boundary_values);
-        
+
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  6,
                                                  get_fe_function(6, s),
                                                  boundary_values);
-
-        std::cout << "we are at least moving on from imposing a condition on gamma6..." << std::endl;
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  8,
@@ -807,7 +816,7 @@ void Step6<dim>::run(const unsigned int cycle, const unsigned int s) {
     std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
               << std::endl;
 
-    //refine_grid();
+    refine_grid();
 
     setup_system();
 
