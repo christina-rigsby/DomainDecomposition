@@ -179,12 +179,12 @@ Step6<dim>::Step6(const unsigned int subdomain)
                  //set boundary_id to 2 along the portion of gamma2 that makes up part of the right
                  // boundary edge of subdomain0
                  if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
-                     (std::fabs(center(dim - 1) > 0.25)))
+                     (center(dim - 1) > 0.25))
                      face->set_boundary_id(2);
 
                  //set boundary_id to 6 along gamma6, the remaining portion of subdomain0's right edge
                  if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
-                     (std::fabs(center(dim - 1) <= 0.25)))
+                     (center(dim - 1) <= 0.25))
                      face->set_boundary_id(6);
 
              //Bottom edge:
@@ -192,12 +192,12 @@ Step6<dim>::Step6(const unsigned int subdomain)
                  //set boundary_id to 4 along the portion of gamma4 that makes up part of the bottom
                  // boundary edge of subdomain0
                  if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
-                     (std::fabs(center(0) < -0.25)))
+                     (center(0) < -0.25))
                      face->set_boundary_id(4);
 
                  //set boundary_id to 8 along gamma8, the remaining portion of subdomain0's bottom edge
                  if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
-                     (std::fabs(center(0) >= -0.25)))
+                     (center(0) >= -0.25))
                      face->set_boundary_id(8);
 
              //Remaining edges have boundary_ids of 0 by default.
@@ -215,12 +215,12 @@ Step6<dim>::Step6(const unsigned int subdomain)
                  //set boundary_id to 1 along portion of gamma1 that makes up part of the left
                  // boundary edge of subdomain1
                  if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
-                     (std::fabs(center(dim - 1) > 0.25)))
+                     (center(dim - 1) > 0.25))
                      face->set_boundary_id(1);
 
                  //set boundary_id to 5 along gamma5, the remaining portion of subdomain1's left edge
                  if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
-                     (std::fabs(center(dim - 1) <= 0.25)))
+                     (center(dim - 1) <= 0.25))
                      face->set_boundary_id(5);
 
              //Bottom edge:
@@ -228,12 +228,12 @@ Step6<dim>::Step6(const unsigned int subdomain)
                  //set boundary_id to 4 along portion of gamma4 that makes up part of the bottom
                  // boundary edge of subdomain1
                  if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
-                     (std::fabs(center(0) > 0.25)))
+                     (center(0) > 0.25))
                      face->set_boundary_id(4);
 
                  //set boundary_id to 8 along gamma8, the remaining portion of subdomain1's bottom edge
                  if ((std::fabs(center(dim - 1) - (-0.25)) < 1e-12) &&
-                     (std::fabs(center(0) <= 0.25)))
+                     (center(0) <= 0.25))
                      face->set_boundary_id(8);
 
              //Remaining edges have boundary_ids of 0 by default.
@@ -251,12 +251,12 @@ Step6<dim>::Step6(const unsigned int subdomain)
                  //set boundary_id to 1 along portion of gamma1 that makes up part of the left
                  // boundary edge of subdomain2
                  if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
-                     (std::fabs(center(dim - 1) < -0.25)))
+                     (center(dim - 1) < -0.25))
                      face->set_boundary_id(1);
 
                  //set boundary_id to 5 along gamma5, the remaining portion of subdomain2's left edge
                  if ((std::fabs(center(0) - (-0.25)) < 1e-12) &&
-                     (std::fabs(center(dim - 1) >= -0.25)))
+                     (center(dim - 1) >= -0.25))
                      face->set_boundary_id(5);
 
              //Top edge:
@@ -264,12 +264,12 @@ Step6<dim>::Step6(const unsigned int subdomain)
                  //set boundary_id to 3 along portion of gamma3 that makes up part of the top
                  // boundary edge of subdomain2
                  if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
-                     (std::fabs(center(0) > 0.25)))
+                     (center(0) > 0.25))
                      face->set_boundary_id(3);
 
                  //set boundary_id to 7 along gamma7, the remaining portion of subdomain2's top edge
                  if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
-                     (std::fabs(center(0) <= 0.25)))
+                     (center(0) <= 0.25))
                      face->set_boundary_id(7);
 
              //Remaining edges have boundary_ids of 0 by default.
@@ -287,12 +287,12 @@ Step6<dim>::Step6(const unsigned int subdomain)
                  //set boundary_id to 2 along portion of gamma2 that makes up part of the right
                  // boundary edge of subdomain3
                  if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
-                     (std::fabs(center(dim - 1) < -0.25)))
+                     (center(dim - 1) < -0.25))
                      face->set_boundary_id(2);
 
                  //set boundary_id to 6 along gamma6, the remaining portion of subdomain3's right edge
                  if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
-                     (std::fabs(center(dim - 1) >= -0.25)))
+                     (center(dim - 1) >= -0.25))
                      face->set_boundary_id(6);
 
              //Top edge:
@@ -300,12 +300,12 @@ Step6<dim>::Step6(const unsigned int subdomain)
                  //set boundary_id to 3 along portion of gamma3 that makes up part of the top
                  // boundary edge of subdomain3
                  if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
-                     (std::fabs(center(0) < -0.25)))
+                     (center(0) < -0.25))
                      face->set_boundary_id(3);
 
                  //set boundary_id to 7 along gamma7, the remaining portion of subdomain3's top edge
                  if ((std::fabs(center(dim - 1) - (0.25)) < 1e-12) &&
-                     (std::fabs(center(0) >= -0.25)))
+                     (center(0) >= -0.25))
                      face->set_boundary_id(7);
 
              //Remaining edges have boundary_ids of 0 by default.
@@ -403,43 +403,68 @@ Functions::FEFieldFunction<dim> &
             relevant_subdomain = 3;
 
         else //boundary_id == 0
-            relevant_subdomain = -1;
+            Assert (false, ExcInternalError()); //make sure to only use get_fe_function on nonzero boundary_ids!
 
 
     } else if (s == 1) {
         if (boundary_id == 1)
             relevant_subdomain = 0;
 
-        else if (boundary_id == 5 || boundary_id == 8)
+        //else if (boundary_id == 5 || boundary_id == 8)
+        //    relevant_subdomain = 3;
+
+        else if (boundary_id == 5)
+            relevant_subdomain = 3;
+
+        else if (boundary_id == 8)
             relevant_subdomain = 3;
 
         else if (boundary_id == 4)
             relevant_subdomain = 2;
 
         else //boundary_id == 0
-            relevant_subdomain = -1;
+            Assert (false, ExcInternalError());
 
 
     } else if (s == 2) {
+
         if (boundary_id == 3)
             relevant_subdomain = 1;
-        else if (boundary_id == 5 || boundary_id == 7)
+
+        //else if (boundary_id == 5 || boundary_id == 7)
+        //    relevant_subdomain = 0;
+        else if (boundary_id == 5)
             relevant_subdomain = 0;
+
+        else if (boundary_id == 7)
+            relevant_subdomain = 0;
+
         else if (boundary_id == 1)
             relevant_subdomain = 3;
+
         else //boundary_id == 0
-            relevant_subdomain = -1;
+            Assert (false, ExcInternalError());
 
 
     } else if (s == 3) {
+
         if (boundary_id == 3)
             relevant_subdomain = 0;
-        else if (boundary_id == 6 || boundary_id == 7)
+
+        //else if (boundary_id == 6 || boundary_id == 7)
+        //    relevant_subdomain = 1;
+
+        else if (boundary_id == 6)
             relevant_subdomain = 1;
+
+        else if (boundary_id == 7)
+            relevant_subdomain = 1;
+
         else if (boundary_id == 2)
             relevant_subdomain = 2;
+
         else //boundary_id == 0
-            relevant_subdomain = -1;
+            Assert (false, ExcInternalError());
 
 
     } else
@@ -548,7 +573,7 @@ void Step6<dim>::assemble_system(unsigned int s)
                                                  4,
                                                  get_fe_function(4, s),
                                                  boundary_values);
-
+        
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  6,
                                                  get_fe_function(6, s),
