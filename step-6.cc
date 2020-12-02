@@ -127,10 +127,12 @@ Step6<dim>::Step6(const unsigned int subdomain)
 // ----------------------------------------------------------------------------------------------------------------
 
 //4 subdomains case:
-    const std::vector<Point<2>> corner_points = {Point<2>(0, 0.75), Point<2>(1, 1.75),
-                                                 Point<2>(0.75, 0.75), Point<2>(1.75, 1.75),
-                                                 Point<2>(0.75,0), Point<2>(1.75,1),
-                                                 Point<2>(0,0), Point<2>(1,1)};
+
+    const std::vector<Point<2>> corner_points = {Point<2>(-0.875, -0.125), Point<2>(0.125, 0.875),
+                                                 Point<2>(-0.125, -0.125), Point<2>(0.875, 0.875),
+                                                 Point<2>(-0.125,-0.875), Point<2>(0.875,0.125),
+                                                 Point<2>(-0.875,-0.875), Point<2>(0.125,0.125)};
+
 
 
     GridGenerator::hyper_rectangle(triangulation, corner_points[2 * subdomain],
@@ -168,162 +170,161 @@ Step6<dim>::Step6(const unsigned int subdomain)
 //4 subdomain case:
 
     //set the boundary_ids of edges of subdomain0
-     if (subdomain == 0) {
-         for (const auto &cell : triangulation.cell_iterators())
-             for (const auto &face : cell->face_iterators()) {
-                 const auto center = face->center();
+    if (subdomain == 0) {
+        for (const auto &cell : triangulation.cell_iterators())
+            for (const auto &face : cell->face_iterators()) {
+                const auto center = face->center();
 
-             //Right edge:
+                //Right edge:
 
-                 //set boundary_id to 2 along the portion of gamma2 that makes up part of the right
-                 // boundary edge of subdomain0
+                //set boundary_id to 2 along the portion of gamma2 that makes up part of the right
+                // boundary edge of subdomain0
 
-                 //if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
-                 // The center of a cell will not be within 1e-12 of its bounding value! The cells are bigger than this!
-                 // Because of how our subdomains are constructed and because we initially refine their triangulation
-                 // twice, each cell is a 0.25x0.25 square. Therefore, the center of a cell can only be within 0.25/2
-                 // or 0.125 from any bounding x or y value.
-                 // To check that we are on a cell adjacent to an edge gamma, it is therefore sufficient to check that
-                 // the center is strictly within 0.25 of this edge's defining x or y value.
-                 // This value depends entirely on how much refinement is done initially.
+                //if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
+                // The center of a cell will not be within 1e-12 of its bounding value! The cells are bigger than this!
+                // Because of how our subdomains are constructed and because we initially refine their triangulation
+                // twice, each cell is a 0.25x0.25 square. Therefore, the center of a cell can only be within 0.25/2
+                // or 0.125 from any bounding x or y value.
+                // To check that we are on a cell adjacent to an edge gamma, it is therefore sufficient to check that
+                // the center is strictly within 0.25 of this edge's defining x or y value.
+                // This value depends entirely on how much refinement is done initially.
 
-                 if ((std::fabs(center(0) - (1)) < 1e-12) && // I don't understand why '< 1e-12 works', thoughts above...
-                         (center(dim - 1) > 1))
-                     face->set_boundary_id(2);
 
-                 //set boundary_id to 6 along gamma6, the remaining portion of subdomain0's right edge
-                 if ((std::fabs(center(0) - (1)) < 1e-12) &&
-                     (center(dim - 1) <= 1))
-                     face->set_boundary_id(6);
+                if ((std::fabs(center(0) - (0.125)) < 1e-12) && // I don't understand why '< 1e-12 works', thoughts above...
+                    (center(dim - 1) >= 0.125))
+                    face->set_boundary_id(2);
 
-             //Bottom edge:
+                //set boundary_id to 6 along gamma6, the remaining portion of subdomain0's right edge
+                if ((std::fabs(center(0) - (0.125)) < 1e-12) &&
+                    (center(dim - 1) < 0.125))
+                    face->set_boundary_id(6);
 
-                 //set boundary_id to 4 along the portion of gamma4 that makes up part of the bottom
-                 // boundary edge of subdomain0
-                 if ((std::fabs(center(dim - 1) - (0.75)) < 1e-12) &&
-                     (center(0) < 0.75))
-                     face->set_boundary_id(4);
+                //Bottom edge:
 
-                 //set boundary_id to 8 along gamma8, the remaining portion of subdomain0's bottom edge
-                 if ((std::fabs(center(dim - 1) - (0.75)) < 1e-12) &&
-                     (center(0) >= 0.75))
-                     face->set_boundary_id(8);
+                //set boundary_id to 4 along the portion of gamma4 that makes up part of the bottom
+                // boundary edge of subdomain0
+                if ((std::fabs(center(dim - 1) - (-0.125)) < 1e-12) &&
+                    (center(0) < -0.125))
+                    face->set_boundary_id(4);
 
-             //Remaining edges have boundary_ids of 0 by default.
+                //set boundary_id to 8 along gamma8, the remaining portion of subdomain0's bottom edge
+                if ((std::fabs(center(dim - 1) - (-0.125)) < 1e-12) &&
+                    (center(0) >= -0.125))
+                    face->set_boundary_id(8);
 
-             }
+                //Remaining edges have boundary_ids of 0 by default.
 
-         std::cout << "              Properly set boundary_ids of subdomain 0 " <<  std::endl;
+            }
 
-     //set the boundary_ids of edges of subdomain1
-     } else if (subdomain == 1) {
-         for (const auto &cell : triangulation.cell_iterators())
-             for (const auto &face : cell->face_iterators()) {
-                 const auto center = face->center();
+        //set the boundary_ids of edges of subdomain1
+    } else if (subdomain == 1) {
+        for (const auto &cell : triangulation.cell_iterators())
+            for (const auto &face : cell->face_iterators()) {
+                const auto center = face->center();
 
-             //Left edge:
+                //Left edge:
 
-                 //set boundary_id to 1 along portion of gamma1 that makes up part of the left
-                 // boundary edge of subdomain1
-                 if ((std::fabs(center(0) - (0.75)) < 1e-12) &&
-                     (center(dim - 1) > 1))
-                     face->set_boundary_id(1);
+                //set boundary_id to 1 along portion of gamma1 that makes up part of the left
+                // boundary edge of subdomain1
+                if ((std::fabs(center(0) - (-0.125)) < 1e-12) &&
+                    (center(dim - 1) >= 0.125))
+                    face->set_boundary_id(1);
 
-                 //set boundary_id to 5 along gamma5, the remaining portion of subdomain1's left edge
-                 if ((std::fabs(center(0) - (0.75)) < 1e-12) &&
-                     (center(dim - 1) <= 1))
-                     face->set_boundary_id(5);
+                //set boundary_id to 5 along gamma5, the remaining portion of subdomain1's left edge
+                if ((std::fabs(center(0) - (-0.125)) < 1e-12) &&
+                    (center(dim - 1) < 0.125))
+                    face->set_boundary_id(5);
 
-             //Bottom edge:
+                //Bottom edge:
 
-                 //set boundary_id to 4 along portion of gamma4 that makes up part of the bottom
-                 // boundary edge of subdomain1
-                 if ((std::fabs(center(dim - 1) - (0.75)) < 1e-12) &&
-                     (center(0) > 1))
-                     face->set_boundary_id(4);
+                //set boundary_id to 4 along portion of gamma4 that makes up part of the bottom
+                // boundary edge of subdomain1
+                if ((std::fabs(center(dim - 1) - (-0.125)) < 1e-12) &&
+                    (center(0) >= 0.125))
+                    face->set_boundary_id(4);
 
-                 //set boundary_id to 8 along gamma8, the remaining portion of subdomain1's bottom edge
-                 if ((std::fabs(center(dim - 1) - (0.75)) < 1e-12) &&
-                     (center(0) <= 1))
-                     face->set_boundary_id(8);
+                //set boundary_id to 8 along gamma8, the remaining portion of subdomain1's bottom edge
+                if ((std::fabs(center(dim - 1) - (-0.125)) < 1e-12) &&
+                    (center(0) < 0.125))
+                    face->set_boundary_id(8);
 
-             //Remaining edges have boundary_ids of 0 by default.
+                //Remaining edges have boundary_ids of 0 by default.
 
-             }
+            }
 
-     //set the boundary_ids of edges of subdomain2
-     } else if (subdomain == 2) {
-         for (const auto &cell : triangulation.cell_iterators())
-             for (const auto &face : cell->face_iterators()) {
-                 const auto center = face->center();
+        //set the boundary_ids of edges of subdomain2
+    } else if (subdomain == 2) {
+        for (const auto &cell : triangulation.cell_iterators())
+            for (const auto &face : cell->face_iterators()) {
+                const auto center = face->center();
 
-             //Left edge:
+                //Left edge:
 
-                 //set boundary_id to 1 along portion of gamma1 that makes up part of the left
-                 // boundary edge of subdomain2
-                 if ((std::fabs(center(0) - (0.75)) < 1e-12) &&
-                     (center(dim - 1) < 0.75))
-                     face->set_boundary_id(1);
+                //set boundary_id to 1 along portion of gamma1 that makes up part of the left
+                // boundary edge of subdomain2
+                if ((std::fabs(center(0) - (-0.125)) < 1e-12) &&
+                    (center(dim - 1) <= -0.125))
+                    face->set_boundary_id(1);
 
-                 //set boundary_id to 5 along gamma5, the remaining portion of subdomain2's left edge
-                 if ((std::fabs(center(0) - (0.75)) < 1e-12) &&
-                     (center(dim - 1) >= 0.75))
-                     face->set_boundary_id(5);
+                //set boundary_id to 5 along gamma5, the remaining portion of subdomain2's left edge
+                if ((std::fabs(center(0) - (-0.125)) < 1e-12) &&
+                    (center(dim - 1) > -0.125))
+                    face->set_boundary_id(5);
 
-             //Top edge:
+                //Top edge:
 
-                 //set boundary_id to 3 along portion of gamma3 that makes up part of the top
-                 // boundary edge of subdomain2
-                 if ((std::fabs(center(dim - 1) - (1)) < 1e-12) &&
-                     (center(0) > 1))
-                     face->set_boundary_id(3);
+                //set boundary_id to 3 along portion of gamma3 that makes up part of the top
+                // boundary edge of subdomain2
+                if ((std::fabs(center(dim - 1) - (0.125)) < 1e-12) &&
+                    (center(0) >= 0.125))
+                    face->set_boundary_id(3);
 
-                 //set boundary_id to 7 along gamma7, the remaining portion of subdomain2's top edge
-                 if ((std::fabs(center(dim - 1) - (1)) < 1e-12) &&
-                     (center(0) <= 1))
-                     face->set_boundary_id(7);
+                //set boundary_id to 7 along gamma7, the remaining portion of subdomain2's top edge
+                if ((std::fabs(center(dim - 1) - (0.125)) < 1e-12) &&
+                    (center(0) < 0.125))
+                    face->set_boundary_id(7);
 
-             //Remaining edges have boundary_ids of 0 by default.
+                //Remaining edges have boundary_ids of 0 by default.
 
-             }
+            }
 
-     //set the boundary_ids of edges of subdomain3
-     } else if (subdomain == 3) {
-         for (const auto &cell : triangulation.cell_iterators())
-             for (const auto &face : cell->face_iterators()) {
-                 const auto center = face->center();
+        //set the boundary_ids of edges of subdomain3
+    } else if (subdomain == 3) {
+        for (const auto &cell : triangulation.cell_iterators())
+            for (const auto &face : cell->face_iterators()) {
+                const auto center = face->center();
 
-             //Right edge:
+                //Right edge:
 
-                 //set boundary_id to 2 along portion of gamma2 that makes up part of the right
-                 // boundary edge of subdomain3
-                 if ((std::fabs(center(0) - (1)) < 1e-12) &&
-                     (center(dim - 1) < 0.75))
-                     face->set_boundary_id(2);
+                //set boundary_id to 2 along portion of gamma2 that makes up part of the right
+                // boundary edge of subdomain3
+                if ((std::fabs(center(0) - (0.125)) < 1e-12) &&
+                    (center(dim - 1) <= -0.125))
+                    face->set_boundary_id(2);
 
-                 //set boundary_id to 6 along gamma6, the remaining portion of subdomain3's right edge
-                 if ((std::fabs(center(0) - (1)) < 1e-12) &&
-                     (center(dim - 1) >= 0.75))
-                     face->set_boundary_id(6);
+                //set boundary_id to 6 along gamma6, the remaining portion of subdomain3's right edge
+                if ((std::fabs(center(0) - (0.125)) < 1e-12) &&
+                    (center(dim - 1) > -0.125))
+                    face->set_boundary_id(6);
 
-             //Top edge:
+                //Top edge:
 
-                 //set boundary_id to 3 along portion of gamma3 that makes up part of the top
-                 // boundary edge of subdomain3
-                 if ((std::fabs(center(dim - 1) - (1)) < 1e-12) &&
-                     (center(0) < 0.75))
-                     face->set_boundary_id(3);
+                //set boundary_id to 3 along portion of gamma3 that makes up part of the top
+                // boundary edge of subdomain3
+                if ((std::fabs(center(dim - 1) - (0.125)) < 1e-12) &&
+                    (center(0) <= -0.125))
+                    face->set_boundary_id(3);
 
-                 //set boundary_id to 7 along gamma7, the remaining portion of subdomain3's top edge
-                 if ((std::fabs(center(dim - 1) - (1)) < 1e-12) &&
-                     (center(0) >= 0.75))
-                     face->set_boundary_id(7);
+                //set boundary_id to 7 along gamma7, the remaining portion of subdomain3's top edge
+                if ((std::fabs(center(dim - 1) - (0.125)) < 1e-12) &&
+                    (center(0) > -0.125))
+                    face->set_boundary_id(7);
 
-             //Remaining edges have boundary_ids of 0 by default.
+                //Remaining edges have boundary_ids of 0 by default.
 
-         }
+            }
 
-     } else
+    } else
         Assert (false, ExcInternalError()); // always aborts the program
 
 
@@ -408,7 +409,7 @@ Functions::FEFieldFunction<dim> &
             relevant_subdomain = 2;
 
         else if (boundary_id == 8)
-            relevant_subdomain = 2;
+            relevant_subdomain = 3;
 
         else if (boundary_id == 4)
             relevant_subdomain = 3;
@@ -425,7 +426,7 @@ Functions::FEFieldFunction<dim> &
         //    relevant_subdomain = 3;
 
         else if (boundary_id == 5)
-            relevant_subdomain = 3;
+            relevant_subdomain = 0;
 
         else if (boundary_id == 8)
             relevant_subdomain = 3;
@@ -448,7 +449,7 @@ Functions::FEFieldFunction<dim> &
             relevant_subdomain = 0;
 
         else if (boundary_id == 7)
-            relevant_subdomain = 0;
+            relevant_subdomain = 1;
 
         else if (boundary_id == 1)
             relevant_subdomain = 3;
@@ -466,7 +467,7 @@ Functions::FEFieldFunction<dim> &
         //    relevant_subdomain = 1;
 
         else if (boundary_id == 6)
-            relevant_subdomain = 1;
+            relevant_subdomain = 2;
 
         else if (boundary_id == 7)
             relevant_subdomain = 1;
@@ -870,7 +871,7 @@ int main()
         }
 
 
-        for (unsigned int cycle=1; cycle<8; ++cycle) //only worked for 11 cycles with refinement
+        for (unsigned int cycle=1; cycle<11; ++cycle)
             for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
                 subdomain_problems[s] -> run(cycle, s);
             }
