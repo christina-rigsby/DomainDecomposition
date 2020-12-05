@@ -58,7 +58,7 @@ class Step6
 {
 public:
     Step6(const unsigned int subdomain);
-    void run(const unsigned int cycle, const unsigned int s);
+    void run(const unsigned int cycle, const unsigned int s, std::string method);
 
     void set_all_subdomain_objects (const std::vector<std::shared_ptr<Step6<dim>>> &objects)
     { subdomain_objects = objects; }
@@ -72,11 +72,13 @@ public:
 
 private:
     void setup_system();
-    void assemble_system(const unsigned int s);
-    Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id, const unsigned int s);
+    void assemble_system(const unsigned int s, std::string method);
+    Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id,
+                                                      const unsigned int s,
+                                                      std::string method);
     void solve();
     void refine_grid();
-    void output_results(const unsigned int cycle, const unsigned int s) const;
+    void output_results(const unsigned int cycle, const unsigned int s, std::string method) const;
 
     std::vector<std::shared_ptr<Step6<dim>>> subdomain_objects;
 
@@ -377,7 +379,7 @@ void Step6<dim>::setup_system()
 //Need function to get the appropriate solution fe_function:
 template<int dim>
 Functions::FEFieldFunction<dim> &
-        Step6<dim>::get_fe_function(unsigned int boundary_id, unsigned int s)
+        Step6<dim>::get_fe_function(unsigned int boundary_id, unsigned int s, std::string method)
 {
 
     // get other subdomain id
@@ -488,8 +490,45 @@ Functions::FEFieldFunction<dim> &
 
     //For Multiplicative Schwarz, we impose the most recently computed solution from neighboring subdomains as the
     // BC of the current subdomain, so we retrieve the last entry of the appropriate solutionfunction_vector:
-    return *subdomain_objects[relevant_subdomain] -> solutionfunction_vector.back();
+    if (method == "Multiplicative")
+        return *subdomain_objects[relevant_subdomain] -> solutionfunction_vector.back();
 
+    //For Additive Schwarz, we impose the solution from the neighboring subdomains' previous cycle as the
+    // BC of the current subdomain, so we retrieve the second to last entry of solutionfunction_vector if the solution
+    // has already been computed on the relevant_subdomain in the current cycle and retrieve the last entry of
+    // relevant_subdomain if the solution on the relevant_subdomain has not yet been computed in the current cycle.
+    // We know that, if we are solving on subdomain_i, then sundomain_k k<i have been solved in the current cycle
+    //                                                      subdomain_k k>i have not been solved in the current cycle.
+    // We also must consider the fact that the second to last entry of solutionfunction_vector may not exist; namely
+    // when the size of solutionfunction_vector is 1. In this case, we need to retrieve its only entry, which happens
+    // to be the vector's last entry. We can retrieve this as before (with .back()).
+
+    else if (method == "Additive") {
+
+        if (subdomain_objects[relevant_subdomain] -> solutionfunction_vector.size() == 1)
+            return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.back();
+
+        else // subdomain_objects[relevant_subdomain] -> solutionfunction_vector.size() > 1
+            if (relevant_subdomain > s) //then solution for relevant_subdomain has not been computed in the current cycle,
+                // so retrieving the last element of its solutionfunction_vector is retrieving its
+                // solution from the previous cycle
+                return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.back();
+
+            else if (relevant_subdomain < s) //then solution for relevant_subdomain has been computed in the current cycle,
+                // so retrieving the second to last element of its solutionfunction_vector is
+                // retrieving its solution from the previous cycle
+                return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.rbegin()[1];
+
+            else { // relevant_subdomain = current_subdomain
+                std::cout << "Error: relevant_subdomain cannot be the same as the current subdomain" << std::endl;
+                Assert (false, ExcInternalError());
+            }
+
+    } else { //Neither Multiplicative Schwarz nor Additve Schwarz were chosen as the solving method
+        std::cout << "Error: 'Multiplicative' or 'Additive' must be chosen as the solving method" << std::endl;
+        Assert (false, ExcInternalError());
+
+    }
     //Later, for Additive Schwarz, we will sometimes need to access the second to last element of a
     // solutionfunction_vector.
 
@@ -499,7 +538,7 @@ Functions::FEFieldFunction<dim> &
 
 
 template <int dim>
-void Step6<dim>::assemble_system(unsigned int s)
+void Step6<dim>::assemble_system(unsigned int s, std::string method)
 {
     system_matrix = 0;
     system_rhs = 0;
@@ -557,13 +596,13 @@ void Step6<dim>::assemble_system(unsigned int s)
      if (s==0) {
          VectorTools::interpolate_boundary_values(dof_handler,
                                                   2,
-                                                  get_fe_function(1, s),
+                                                  get_fe_function(1, s, method),
                                                   boundary_values);
 
      } else { //s=1
          VectorTools::interpolate_boundary_values(dof_handler,
                                                   1,
-                                                  get_fe_function(1, s),
+                                                  get_fe_function(1, s, method),
                                                   boundary_values);
      }
 
@@ -578,22 +617,22 @@ void Step6<dim>::assemble_system(unsigned int s)
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  2,
-                                                 get_fe_function(2, s),
+                                                 get_fe_function(2, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  4,
-                                                 get_fe_function(4, s),
+                                                 get_fe_function(4, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  6,
-                                                 get_fe_function(6, s),
+                                                 get_fe_function(6, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  8,
-                                                 get_fe_function(8, s),
+                                                 get_fe_function(8, s, method),
                                                  boundary_values);
 
 
@@ -602,65 +641,65 @@ void Step6<dim>::assemble_system(unsigned int s)
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  1,
-                                                 get_fe_function(1, s),
+                                                 get_fe_function(1, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  4,
-                                                 get_fe_function(4, s),
+                                                 get_fe_function(4, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  5,
-                                                 get_fe_function(5, s),
+                                                 get_fe_function(5, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  8,
-                                                 get_fe_function(8, s),
+                                                 get_fe_function(8, s, method),
                                                  boundary_values);
 
     //Impose boundary conditions on edges of subdomain2 with nonzero boundary_ids
     } else if (s == 2){
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  1,
-                                                 get_fe_function(1, s),
+                                                 get_fe_function(1, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  3,
-                                                 get_fe_function(3, s),
+                                                 get_fe_function(3, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  5,
-                                                 get_fe_function(5, s),
+                                                 get_fe_function(5, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  7,
-                                                 get_fe_function(7, s),
+                                                 get_fe_function(7, s, method),
                                                  boundary_values);
 
     } else if (s == 3){
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  2,
-                                                 get_fe_function(2, s),
+                                                 get_fe_function(2, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  3,
-                                                 get_fe_function(3, s),
+                                                 get_fe_function(3, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  6,
-                                                 get_fe_function(6, s),
+                                                 get_fe_function(6, s, method),
                                                  boundary_values);
 
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  7,
-                                                 get_fe_function(7, s),
+                                                 get_fe_function(7, s, method),
                                                  boundary_values);
 
     } else
@@ -677,41 +716,41 @@ void Step6<dim>::assemble_system(unsigned int s)
 
     VectorTools::interpolate_boundary_values(dof_handler,
                                              1,
-                                             get_fe_function(1, s),
+                                             get_fe_function(1, s, method),
                                              boundary_values);
 
     VectorTools::interpolate_boundary_values(dof_handler,
                                              2,
-                                             get_fe_function(2, s),
+                                             get_fe_function(2, s, method),
                                              boundary_values);
 
     VectorTools::interpolate_boundary_values(dof_handler,
                                              3,
-                                             get_fe_function(3, s),
+                                             get_fe_function(3, s, method),
                                              boundary_values);
 
     VectorTools::interpolate_boundary_values(dof_handler,
                                              4,
-                                             get_fe_function(4, s),
+                                             get_fe_function(4, s, method),
                                              boundary_values);
 
     VectorTools::interpolate_boundary_values(dof_handler,
                                              5,
-                                             get_fe_function(5, s),
+                                             get_fe_function(5, s, method),
                                              boundary_values);
 
     VectorTools::interpolate_boundary_values(dof_handler,
                                              6,
-                                             get_fe_function(6, s),
+                                             get_fe_function(6, s, method),
                                              boundary_values);
     VectorTools::interpolate_boundary_values(dof_handler,
                                              7,
-                                             get_fe_function(7, s),
+                                             get_fe_function(7, s, method),
                                              boundary_values);
 
     VectorTools::interpolate_boundary_values(dof_handler,
                                              8,
-                                             get_fe_function(8, s),
+                                             get_fe_function(8, s, method),
                                              boundary_values);
 
     ... or better, with a loop going through all nonzero boundary_id values
@@ -774,39 +813,119 @@ void Step6<dim>::refine_grid()
 
 
 template <int dim>
-void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s) const
+void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s, std::string method) const
 {
+
+    /*if (method == "Multiplicative") {
+
+        {
+
+            GridOut grid_out;
+
+
+            //if (method == "Additive")
+            //    std::ofstream output("ASgrid-" + std::to_string(s*100 + cycle) + "-" + method +".gnuplot");
+            //else //(method == "Multiplicative")
+            //    std::ofstream output("MSgrid-" + std::to_string(s*100 + cycle) + "-" + method +".gnuplot");
+
+
+            std::ofstream output("MSgrid-" + std::to_string(s * 100 + cycle) + ".gnuplot");
+
+
+            GridOutFlags::Gnuplot gnuplot_flags(false, 5);
+            grid_out.set_flags(gnuplot_flags);
+            MappingQGeneric<dim> mapping(3);
+            grid_out.write_gnuplot(triangulation, output, &mapping);
+
+        }
+
+        {
+
+            DataOut<dim> data_out;
+            data_out.attach_dof_handler(dof_handler);
+            data_out.add_data_vector(solution, "solution");
+            data_out.build_patches();
+
+            std::ofstream output("MSsolution-" + std::to_string(s * 100 + cycle) + "-" + method + ".vtu");
+
+            data_out.write_vtu(output);
+
+
+        }
+
+    } else { //method == "Additive"
+
+        {
+
+            GridOut grid_out;
+
+            std::ofstream output("ASgrid-" + std::to_string(s * 100 + cycle) + ".gnuplot");
+
+
+            GridOutFlags::Gnuplot gnuplot_flags(false, 5);
+            grid_out.set_flags(gnuplot_flags);
+            MappingQGeneric<dim> mapping(3);
+            grid_out.write_gnuplot(triangulation, output, &mapping);
+
+        }
+
+        {
+
+            DataOut<dim> data_out;
+            data_out.attach_dof_handler(dof_handler);
+            data_out.add_data_vector(solution, "solution");
+            data_out.build_patches();
+
+            std::ofstream output("ASsolution-" + std::to_string(s * 100 + cycle) + "-" + method + ".vtu");
+
+            data_out.write_vtu(output);
+
+
+        }
+
+
+    }*/
+
     {
 
         GridOut grid_out;
 
-        std::ofstream output("grid-" + std::to_string(s*100 + cycle)  +".gnuplot");
+        std::ofstream output("grid-" + std::to_string(s * 100 + cycle) + ".gnuplot");
 
         GridOutFlags::Gnuplot gnuplot_flags(false, 5);
         grid_out.set_flags(gnuplot_flags);
         MappingQGeneric<dim> mapping(3);
         grid_out.write_gnuplot(triangulation, output, &mapping);
 
-
     }
+
     {
+
         DataOut<dim> data_out;
         data_out.attach_dof_handler(dof_handler);
         data_out.add_data_vector(solution, "solution");
         data_out.build_patches();
 
-        std::ofstream output("solution-" + std::to_string(s*100 + cycle) + ".vtu");
+        std::ofstream output("solution-" + std::to_string(s * 100 + cycle) + ".vtu");
 
         data_out.write_vtu(output);
 
     }
+
+
+
+
+
+
+
+
 }
 
 
 
 
 template <int dim>
-void Step6<dim>::run(const unsigned int cycle, const unsigned int s) {
+void Step6<dim>::run(const unsigned int cycle, const unsigned int s, std::string method) {
 
     //For debugging purposes only:
     std::cout << "Cycle:  " << cycle << std::endl;
@@ -827,7 +946,15 @@ void Step6<dim>::run(const unsigned int cycle, const unsigned int s) {
     std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
               << std::endl;
 
-    assemble_system(s);
+    //Don't want to ask this at every cycle!
+    /*
+    //Choose whether we use Multiplicative or Additive Schwarz to solve
+    std::string method;
+    std::cout << "Which Schwarz method would you like to use to solve? (Multiplicative or Additive)" << std::endl;
+    std::cin >> method;
+*/
+
+    assemble_system(s, method);
 
         //For debugging purposes only:
         std::cout << "   Number of active cells:       "
@@ -836,7 +963,7 @@ void Step6<dim>::run(const unsigned int cycle, const unsigned int s) {
 
     solve();
 
-    output_results(cycle, s);
+    output_results(cycle, s, method);
 
 }
 
@@ -870,10 +997,14 @@ int main()
             subdomain_problems[s] -> set_all_subdomain_objects(subdomain_problems);
         }
 
+        //Choose whether we use Multiplicative or Additive Schwarz to solve
+        std::string method;
+        std::cout << "Which Schwarz method would you like to use to solve? (Multiplicative or Additive)" << std::endl;
+        std::cin >> method;
 
-        for (unsigned int cycle=1; cycle<11; ++cycle)
+        for (unsigned int cycle=1; cycle<10; ++cycle)
             for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
-                subdomain_problems[s] -> run(cycle, s);
+                subdomain_problems[s] -> run(cycle, s, method);
             }
 
     }
