@@ -63,6 +63,7 @@ public:
     void set_all_subdomain_objects (const std::vector<std::shared_ptr<Step6<dim>>> &objects)
     { subdomain_objects = objects; }
 
+    std::vector<Vector<double>> solution_vector;
     std::vector<std::unique_ptr<Functions::FEFieldFunction<dim>>> solutionfunction_vector;
 
     //const std::vector<Point<2>> corner_points;
@@ -401,97 +402,95 @@ Functions::FEFieldFunction<dim> &
 
 //4 subdomain case:
 
-    if (s == 0){
-        if (boundary_id == 2)
-            relevant_subdomain = 1;
+    if (method == "Multiplicative") {
 
-        //else if (boundary_id == 6 || boundary_id == 8)
-        //    relevant_subdomain = 2;
-        else if (boundary_id == 6)
-            relevant_subdomain = 2;
 
-        else if (boundary_id == 8)
-            relevant_subdomain = 3;
+        if (s == 0) {
+            if (boundary_id == 2)
+                relevant_subdomain = 1;
 
-        else if (boundary_id == 4)
-            relevant_subdomain = 3;
+            else if (boundary_id == 6)
+                relevant_subdomain = 2;
 
-        else //boundary_id == 0
+            else if (boundary_id == 8)
+                relevant_subdomain = 3;
+
+            else if (boundary_id == 4)
+                relevant_subdomain = 3;
+
+            else //boundary_id == 0
             Assert (false, ExcInternalError()); //make sure to only use get_fe_function on nonzero boundary_ids!
 
 
-    } else if (s == 1) {
-        if (boundary_id == 1)
-            relevant_subdomain = 0;
+        } else if (s == 1) {
+            if (boundary_id == 1)
+                relevant_subdomain = 0;
 
-        //else if (boundary_id == 5 || boundary_id == 8)
-        //    relevant_subdomain = 3;
+            else if (boundary_id == 5)
+                relevant_subdomain = 0;
 
-        else if (boundary_id == 5)
-            relevant_subdomain = 0;
+            else if (boundary_id == 8)
+                relevant_subdomain = 3;
 
-        else if (boundary_id == 8)
-            relevant_subdomain = 3;
+            else if (boundary_id == 4)
+                relevant_subdomain = 2;
 
-        else if (boundary_id == 4)
-            relevant_subdomain = 2;
-
-        else //boundary_id == 0
+            else //boundary_id == 0
             Assert (false, ExcInternalError());
 
 
-    } else if (s == 2) {
+        } else if (s == 2) {
 
-        if (boundary_id == 3)
-            relevant_subdomain = 1;
+            if (boundary_id == 3)
+                relevant_subdomain = 1;
 
-        //else if (boundary_id == 5 || boundary_id == 7)
-        //    relevant_subdomain = 0;
-        else if (boundary_id == 5)
-            relevant_subdomain = 0;
+            else if (boundary_id == 5)
+                relevant_subdomain = 0;
 
-        else if (boundary_id == 7)
-            relevant_subdomain = 1;
+            else if (boundary_id == 7)
+                relevant_subdomain = 1;
 
-        else if (boundary_id == 1)
-            relevant_subdomain = 3;
+            else if (boundary_id == 1)
+                relevant_subdomain = 3;
 
-        else //boundary_id == 0
+            else //boundary_id == 0
             Assert (false, ExcInternalError());
 
 
-    } else if (s == 3) {
+        } else if (s == 3) {
 
-        if (boundary_id == 3)
-            relevant_subdomain = 0;
+            if (boundary_id == 3)
+                relevant_subdomain = 0;
 
-        //else if (boundary_id == 6 || boundary_id == 7)
-        //    relevant_subdomain = 1;
+            else if (boundary_id == 6)
+                relevant_subdomain = 2;
 
-        else if (boundary_id == 6)
-            relevant_subdomain = 2;
+            else if (boundary_id == 7)
+                relevant_subdomain = 1;
 
-        else if (boundary_id == 7)
-            relevant_subdomain = 1;
+            else if (boundary_id == 2)
+                relevant_subdomain = 2;
 
-        else if (boundary_id == 2)
-            relevant_subdomain = 2;
-
-        else //boundary_id == 0
+            else //boundary_id == 0
             Assert (false, ExcInternalError());
 
 
-    } else
-        Assert (false, ExcInternalError()); // always aborts the program
+        } else Assert (false, ExcInternalError()); // always aborts the program
 
-    //For debugging:
-    std::cout << "              The BC function for subdomain " << s << " on gamma" << boundary_id <<
-                 " is from subdomain " << relevant_subdomain <<  std::endl;
+        //For debugging:
+        std::cout << "              The BC function for subdomain " << s << " on gamma" << boundary_id <<
+                  " is from subdomain " << relevant_subdomain << std::endl;
 
-    //For Multiplicative Schwarz, we impose the most recently computed solution from neighboring subdomains as the
-    // BC of the current subdomain, so we retrieve the last entry of the appropriate solutionfunction_vector:
-    if (method == "Multiplicative")
-        return *subdomain_objects[relevant_subdomain] -> solutionfunction_vector.back();
+        //For Multiplicative Schwarz, we impose the most recently computed solution from neighboring subdomains as the
+        // BC of the current subdomain, so we retrieve the last entry of the appropriate solutionfunction_vector:
+
+        return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.back();
+
+
+    //ADDITIVE//--------------------------------------------------------------------------------------------------------
+
+
+    } else if (method == "Additive") {
 
     //For Additive Schwarz, we impose the solution from the neighboring subdomains' previous cycle as the
     // BC of the current subdomain, so we retrieve the second to last entry of solutionfunction_vector if the solution
@@ -503,34 +502,163 @@ Functions::FEFieldFunction<dim> &
     // when the size of solutionfunction_vector is 1. In this case, we need to retrieve its only entry, which happens
     // to be the vector's last entry. We can retrieve this as before (with .back()).
 
-    else if (method == "Additive") {
 
-        if (subdomain_objects[relevant_subdomain] -> solutionfunction_vector.size() == 1)
-            return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.back();
 
-        else // subdomain_objects[relevant_subdomain] -> solutionfunction_vector.size() > 1
-            if (relevant_subdomain > s) //then solution for relevant_subdomain has not been computed in the current cycle,
+    // Inaccurate implementation: BC entirely retrieved from neighboring subdomain rather than being a weighted average
+    // of all solutions from subdomains in the overlapping region:
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        //if ((subdomain_objects[relevant_subdomain] -> solutionfunction_vector.size()) == 1)
+        //    return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.back();
+
+
+
+        //else {// subdomain_objects[relevant_subdomain] -> solutionfunction_vector.size() > 1
+        //    if (relevant_subdomain > s) //then solution for relevant_subdomain has not been computed in the current cycle,
                 // so retrieving the last element of its solutionfunction_vector is retrieving its
                 // solution from the previous cycle
-                return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.back();
+        //        return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.back();
 
-            else if (relevant_subdomain < s) //then solution for relevant_subdomain has been computed in the current cycle,
+        //    else if (relevant_subdomain < s) { //then solution for relevant_subdomain has been computed in the current cycle,
                 // so retrieving the second to last element of its solutionfunction_vector is
                 // retrieving its solution from the previous cycle
-                return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.rbegin()[1];
+        //        return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.rbegin()[1];
 
-            else { // relevant_subdomain = current_subdomain
-                std::cout << "Error: relevant_subdomain cannot be the same as the current subdomain" << std::endl;
+        //    } else { // relevant_subdomain = current_subdomain
+        //        std::cout << "Error: relevant_subdomain cannot be the same as the current subdomain" << std::endl;
+        //        Assert (false, ExcInternalError());
+        //    }
+
+    // end of inaccurate implementation ////////////////////////////////////////////////////////////////////////////////
+
+
+    //Incomplete correction below:
+
+        std::vector<int> relevant_subdomains;
+
+        if (s == 0) {
+            if (boundary_id == 2) {
+                relevant_subdomains = {1, 0};
+
+            } else if (boundary_id == 6) {
+                relevant_subdomains = {2,0,1,3};
+
+            } else if (boundary_id == 8) {
+                relevant_subdomains = {3,0,1,2};
+
+            } else if (boundary_id == 4) {
+                relevant_subdomains = {3,0,1,2};
+
+            } else //boundary_id == 0
+            Assert (false, ExcInternalError());
+
+
+        } else if (s == 1) {
+            if (boundary_id == 1) {
+                relevant_subdomains = {0,1};
+
+            } else if (boundary_id == 5) {
+                relevant_subdomains = {0,1,2,3};
+
+            } else if (boundary_id == 8) {
+                relevant_subdomains = {3,0,1,2};
+
+            } else if (boundary_id == 4) {
+                relevant_subdomains = {2,1};
+
+            } else //boundary_id == 0
                 Assert (false, ExcInternalError());
+
+
+        } else if (s == 2) {
+
+            if (boundary_id == 3)
+                relevant_subdomains = {1,2};
+
+            else if (boundary_id == 5)
+                relevant_subdomains = {0,1,2,3};
+
+            else if (boundary_id == 7)
+                relevant_subdomains = {1,0,2,3};
+
+            else if (boundary_id == 1)
+                relevant_subdomains = {3,2};
+
+            else //boundary_id == 0
+            Assert (false, ExcInternalError());
+
+
+        } else if (s == 3) {
+
+            if (boundary_id == 3)
+                relevant_subdomains = {0,3};
+
+            else if (boundary_id == 6)
+                relevant_subdomains = {2,0,1,3};
+
+            else if (boundary_id == 7)
+                relevant_subdomains = {1,0,2,3};
+
+            else if (boundary_id == 2)
+                relevant_subdomains = {2,3};
+
+            else //boundary_id == 0
+            Assert (false, ExcInternalError());
+
+
+        } else Assert (false, ExcInternalError());
+
+
+
+        std::vector<Vector<double>> overlapping_solutions;
+
+        for (int i=0; i < relevant_subdomains.size(); i++) {
+
+            if ((subdomain_objects[relevant_subdomains[i]]->solution_vector.size()) == 1)
+                overlapping_solutions.push_back(subdomain_objects[relevant_subdomains[i]]->solution_vector.back());
+
+
+            else {// subdomain_objects[relevant_subdomain] -> solution_vector.size() > 1
+                if (relevant_subdomain >= s) //then solution for relevant_subdomain has not been computed in the current cycle,
+                    // so retrieving the last element of its solution_vector is retrieving its
+                    // solution from the previous cycle
+                    overlapping_solutions.push_back(subdomain_objects[relevant_subdomains[i]]->solution_vector.back());
+
+                else // (relevant_subdomain < s) { //then solution for relevant_subdomain has been computed in the current cycle,
+                    // so retrieving the second to last element of its solution_vector is
+                    // retrieving its solution from the previous cycle
+                    overlapping_solutions.push_back(subdomain_objects[relevant_subdomains[i]]->solution_vector.rbegin()[1]);
+
+            //When solving subdomains in parallel for each cycle, the above if-else is no longer necessary. No matter
+            //what, we only need the last entry of the solution_vector belonging to each of the entries of the
+            //relevant_subdomains vector.
+
             }
 
-    } else { //Neither Multiplicative Schwarz nor Additve Schwarz were chosen as the solving method
+        }
+
+        //TODO: loop through all overlapping_solutions entries, resulting in an evenly weighted average of all entries
+        // of this overlapping_solutions vector.
+        Vector<double> solution_in_overlap;
+        solution_in_overlap = VectorOperation::add(1/(overlapping_solutions.size()),
+                                                  overlapping_solutions[0],
+                                                  ...
+                                                  1/(overlapping_solutions.size()),
+                                                  overlapping_solutions[overlapping_solutions.size()-1]);
+
+
+        Functions::FEFieldFunction<2> fe_function (dof_handler, solution_in_overlap);
+        return fe_function;
+
+    //------------------------------------------------------------------------------------------------------------------
+
+
+    } else { //Neither Multiplicative Schwarz nor Additive Schwarz were chosen as the solving method
         std::cout << "Error: 'Multiplicative' or 'Additive' must be chosen as the solving method" << std::endl;
         Assert (false, ExcInternalError());
 
     }
-    //Later, for Additive Schwarz, we will sometimes need to access the second to last element of a
-    // solutionfunction_vector.
+
 
 }
 
@@ -778,10 +906,13 @@ void Step6<dim>::solve()
     solver.solve(system_matrix, solution, system_rhs, preconditioner);
     constraints.distribute(solution);
 
+//Store solution in vector that can be retrieved elsewhere:
+    solution_vector.push_back(solution);
+
 //Store solution as function that can be retrieved elsewhere:
-    std::unique_ptr<Functions::FEFieldFunction<dim>> pointer =
+    std::unique_ptr<Functions::FEFieldFunction<dim>> solutionfunction_pointer =
             std::make_unique<Functions::FEFieldFunction<dim>>(dof_handler, solution);
-    solutionfunction_vector.emplace_back (std::move(pointer));
+    solutionfunction_vector.emplace_back (std::move(solutionfunction_pointer));
 
     std::cout << "  max solution value=" << solution.linfty_norm()
               << std::endl;
@@ -914,11 +1045,6 @@ void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s, 
 
 
 
-
-
-
-
-
 }
 
 
@@ -946,13 +1072,6 @@ void Step6<dim>::run(const unsigned int cycle, const unsigned int s, std::string
     std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
               << std::endl;
 
-    //Don't want to ask this at every cycle!
-    /*
-    //Choose whether we use Multiplicative or Additive Schwarz to solve
-    std::string method;
-    std::cout << "Which Schwarz method would you like to use to solve? (Multiplicative or Additive)" << std::endl;
-    std::cin >> method;
-*/
 
     assemble_system(s, method);
 
@@ -981,14 +1100,6 @@ int main()
         subdomain_problems.push_back (std::make_shared<Step6<2>> (1));
         subdomain_problems.push_back (std::make_shared<Step6<2>> (2));
         subdomain_problems.push_back (std::make_shared<Step6<2>> (3));
-        //Want to do this in a loop instead:
-
-        /*
-        for(unsigned int s=0; s<0.5*corner_points.size(); ++s){ //does not recognize corner_points
-            subdomain_problems.push_back (std::make_shared<Step6<2>> (s));
-        }
-        */
-
 
 
         // Tell each of the objects representing one subdomain each about the objects representing all of the
