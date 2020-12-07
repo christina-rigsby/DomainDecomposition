@@ -20,6 +20,7 @@
  * Author: Wolfgang Bangerth, University of Heidelberg, 2000 */
 
 
+// @sect3{Include files}
 
 #include <deal.II/base/quadrature_lib.h>
 
@@ -51,7 +52,22 @@
 #include <deal.II/numerics/error_estimator.h>
 
 
+//(<code> )
+
 using namespace dealii;
+
+
+// @sect3{The <code>Step6</code> class template}
+
+// We have added two new functions to the main class: (<code> set_all_subdomain_objects) and (<code> get_fe_function).
+// Since we are creating new objects for each subdomain including triangulation, system_rhs, solution, etc., we have
+// to explicitly make each aware of the other, which is exactly what is achieved by (<code> set_all_subdomain_objects).
+// A new object that helps with this is the vector where these subdomain objects are stored,
+// (<code> subdomain_objects).
+// Meanwhile, (<code> get_fe_function) provides a way to retrieve the appropriate function to apply as a boundary
+// condition on a particular boundary_id. Helpful to this function are the vectors (<code> solutionfunction_vector) and
+// (<code> solution_vector) which are populated at the end of (<code> solve). More details are provided there.
+
 
 template <int dim>
 class Step6
@@ -65,10 +81,6 @@ public:
 
     std::vector<Vector<double>> solution_vector;
     std::vector<std::unique_ptr<Functions::FEFieldFunction<dim>>> solutionfunction_vector;
-
-    //const std::vector<Point<2>> corner_points;
-
-
 
 
 private:
@@ -94,10 +106,13 @@ private:
     SparseMatrix<double> system_matrix;
     SparsityPattern      sparsity_pattern;
 
-    Vector<double> solution; //initialized with default value of 0
+    Vector<double> solution;
     Vector<double> system_rhs;
 
 };
+
+
+// @sect4{Nonconstant coefficients}
 
 
 template <int dim>
@@ -110,6 +125,15 @@ double coefficient(const Point<dim> &p)
 }
 
 
+
+// @sect3{The <code>Step6</code> class implementation}
+
+
+// @sect4{Step6::Step6}
+
+// Here we have a few additions. First is the initialization of the subdomain on which we are preparing to solve.
+
+
 template <int dim>
 Step6<dim>::Step6(const unsigned int subdomain)
 
@@ -119,17 +143,7 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
 {
 
-//Create separate triangulations for each subdomain: --------------------------------------------------------------
-
-
-// ----------------------------------------------------------------------------------------------------------------
-// 2 subdomains case:
-    //const std::vector<Point<2>> corner_points = {Point<2>(-1, -1), Point<2>(0.25, 1),
-    //                                             Point<2>(-0.25, -1), Point<2>(1, 1)};
-
-// ----------------------------------------------------------------------------------------------------------------
-
-//4 subdomains case:
+// Then we manually create the subdomains using their defining corner points:
 
     const std::vector<Point<2>> corner_points = {Point<2>(-0.875, -0.125), Point<2>(0.125, 0.875),
                                                  Point<2>(-0.125, -0.125), Point<2>(0.875, 0.875),
@@ -145,34 +159,10 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
 
 
-// Set boundary_ids: ----------------------------------------------------------------------------------------------
+// Lastly, we set boundary_ids (those not explicitly set to a value are zero by default, a fact that we use later):
 
 
-// ----------------------------------------------------------------------------------------------------------------
-//2 subdomain case
-    //set the boundary_id to 2 along gamma2:
-   /* if (subdomain == 0) {
-        for (const auto &cell : triangulation.cell_iterators())
-            for (const auto &face : cell->face_iterators()) {
-                const auto center = face->center();
-                if ((std::fabs(center(0) - (0.25)) < 1e-12))
-                    face->set_boundary_id(2);
-            }
-
-    } else { //we are in subdomain 1 and set the boundary_id to 1 along gamma1:
-        for (const auto &cell : triangulation.cell_iterators())
-        for (const auto &face : cell->face_iterators()) {
-            const auto center = face->center();
-            if ((std::fabs(center(0) - (-0.25)) < 1e-12))
-                face->set_boundary_id(1);
-        }
-    }
-*/
-// ----------------------------------------------------------------------------------------------------------------
-
-//4 subdomain case:
-
-    //set the boundary_ids of edges of subdomain0
+    //Set the boundary_ids of edges of subdomain0
     if (subdomain == 0) {
         for (const auto &cell : triangulation.cell_iterators())
             for (const auto &face : cell->face_iterators()) {
@@ -180,37 +170,26 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
                 //Right edge:
 
-                //set boundary_id to 2 along the portion of gamma2 that makes up part of the right
+                //Set boundary_id to 2 along the portion of gamma2 that makes up part of the right
                 // boundary edge of subdomain0
-
-                //if ((std::fabs(center(0) - (0.25)) < 1e-12) &&
-                // The center of a cell will not be within 1e-12 of its bounding value! The cells are bigger than this!
-                // Because of how our subdomains are constructed and because we initially refine their triangulation
-                // twice, each cell is a 0.25x0.25 square. Therefore, the center of a cell can only be within 0.25/2
-                // or 0.125 from any bounding x or y value.
-                // To check that we are on a cell adjacent to an edge gamma, it is therefore sufficient to check that
-                // the center is strictly within 0.25 of this edge's defining x or y value.
-                // This value depends entirely on how much refinement is done initially.
-
-
-                if ((std::fabs(center(0) - (0.125)) < 1e-12) && // I don't understand why '< 1e-12 works', thoughts above...
+                if ((std::fabs(center(0) - (0.125)) < 1e-12) &&
                     (center(dim - 1) >= 0.125))
                     face->set_boundary_id(2);
 
-                //set boundary_id to 6 along gamma6, the remaining portion of subdomain0's right edge
+                //Set boundary_id to 6 along gamma6, the remaining portion of subdomain0's right edge
                 if ((std::fabs(center(0) - (0.125)) < 1e-12) &&
                     (center(dim - 1) < 0.125))
                     face->set_boundary_id(6);
 
                 //Bottom edge:
 
-                //set boundary_id to 4 along the portion of gamma4 that makes up part of the bottom
+                //Set boundary_id to 4 along the portion of gamma4 that makes up part of the bottom
                 // boundary edge of subdomain0
                 if ((std::fabs(center(dim - 1) - (-0.125)) < 1e-12) &&
                     (center(0) < -0.125))
                     face->set_boundary_id(4);
 
-                //set boundary_id to 8 along gamma8, the remaining portion of subdomain0's bottom edge
+                //Set boundary_id to 8 along gamma8, the remaining portion of subdomain0's bottom edge
                 if ((std::fabs(center(dim - 1) - (-0.125)) < 1e-12) &&
                     (center(0) >= -0.125))
                     face->set_boundary_id(8);
@@ -219,7 +198,7 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
             }
 
-        //set the boundary_ids of edges of subdomain1
+    //Set the boundary_ids of edges of subdomain1
     } else if (subdomain == 1) {
         for (const auto &cell : triangulation.cell_iterators())
             for (const auto &face : cell->face_iterators()) {
@@ -227,26 +206,26 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
                 //Left edge:
 
-                //set boundary_id to 1 along portion of gamma1 that makes up part of the left
+                //Set boundary_id to 1 along portion of gamma1 that makes up part of the left
                 // boundary edge of subdomain1
                 if ((std::fabs(center(0) - (-0.125)) < 1e-12) &&
                     (center(dim - 1) >= 0.125))
                     face->set_boundary_id(1);
 
-                //set boundary_id to 5 along gamma5, the remaining portion of subdomain1's left edge
+                //Set boundary_id to 5 along gamma5, the remaining portion of subdomain1's left edge
                 if ((std::fabs(center(0) - (-0.125)) < 1e-12) &&
                     (center(dim - 1) < 0.125))
                     face->set_boundary_id(5);
 
                 //Bottom edge:
 
-                //set boundary_id to 4 along portion of gamma4 that makes up part of the bottom
+                //Set boundary_id to 4 along portion of gamma4 that makes up part of the bottom
                 // boundary edge of subdomain1
                 if ((std::fabs(center(dim - 1) - (-0.125)) < 1e-12) &&
                     (center(0) >= 0.125))
                     face->set_boundary_id(4);
 
-                //set boundary_id to 8 along gamma8, the remaining portion of subdomain1's bottom edge
+                //Set boundary_id to 8 along gamma8, the remaining portion of subdomain1's bottom edge
                 if ((std::fabs(center(dim - 1) - (-0.125)) < 1e-12) &&
                     (center(0) < 0.125))
                     face->set_boundary_id(8);
@@ -255,7 +234,7 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
             }
 
-        //set the boundary_ids of edges of subdomain2
+    //Set the boundary_ids of edges of subdomain2
     } else if (subdomain == 2) {
         for (const auto &cell : triangulation.cell_iterators())
             for (const auto &face : cell->face_iterators()) {
@@ -263,26 +242,26 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
                 //Left edge:
 
-                //set boundary_id to 1 along portion of gamma1 that makes up part of the left
+                //Set boundary_id to 1 along portion of gamma1 that makes up part of the left
                 // boundary edge of subdomain2
                 if ((std::fabs(center(0) - (-0.125)) < 1e-12) &&
                     (center(dim - 1) <= -0.125))
                     face->set_boundary_id(1);
 
-                //set boundary_id to 5 along gamma5, the remaining portion of subdomain2's left edge
+                //Set boundary_id to 5 along gamma5, the remaining portion of subdomain2's left edge
                 if ((std::fabs(center(0) - (-0.125)) < 1e-12) &&
                     (center(dim - 1) > -0.125))
                     face->set_boundary_id(5);
 
                 //Top edge:
 
-                //set boundary_id to 3 along portion of gamma3 that makes up part of the top
+                //Set boundary_id to 3 along portion of gamma3 that makes up part of the top
                 // boundary edge of subdomain2
                 if ((std::fabs(center(dim - 1) - (0.125)) < 1e-12) &&
                     (center(0) >= 0.125))
                     face->set_boundary_id(3);
 
-                //set boundary_id to 7 along gamma7, the remaining portion of subdomain2's top edge
+                //Set boundary_id to 7 along gamma7, the remaining portion of subdomain2's top edge
                 if ((std::fabs(center(dim - 1) - (0.125)) < 1e-12) &&
                     (center(0) < 0.125))
                     face->set_boundary_id(7);
@@ -291,7 +270,7 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
             }
 
-        //set the boundary_ids of edges of subdomain3
+    //Set the boundary_ids of edges of subdomain3
     } else if (subdomain == 3) {
         for (const auto &cell : triangulation.cell_iterators())
             for (const auto &face : cell->face_iterators()) {
@@ -299,26 +278,26 @@ Step6<dim>::Step6(const unsigned int subdomain)
 
                 //Right edge:
 
-                //set boundary_id to 2 along portion of gamma2 that makes up part of the right
+                //Set boundary_id to 2 along portion of gamma2 that makes up part of the right
                 // boundary edge of subdomain3
                 if ((std::fabs(center(0) - (0.125)) < 1e-12) &&
                     (center(dim - 1) <= -0.125))
                     face->set_boundary_id(2);
 
-                //set boundary_id to 6 along gamma6, the remaining portion of subdomain3's right edge
+                //Set boundary_id to 6 along gamma6, the remaining portion of subdomain3's right edge
                 if ((std::fabs(center(0) - (0.125)) < 1e-12) &&
                     (center(dim - 1) > -0.125))
                     face->set_boundary_id(6);
 
                 //Top edge:
 
-                //set boundary_id to 3 along portion of gamma3 that makes up part of the top
+                //Set boundary_id to 3 along portion of gamma3 that makes up part of the top
                 // boundary edge of subdomain3
                 if ((std::fabs(center(dim - 1) - (0.125)) < 1e-12) &&
                     (center(0) <= -0.125))
                     face->set_boundary_id(3);
 
-                //set boundary_id to 7 along gamma7, the remaining portion of subdomain3's top edge
+                //Set boundary_id to 7 along gamma7, the remaining portion of subdomain3's top edge
                 if ((std::fabs(center(dim - 1) - (0.125)) < 1e-12) &&
                     (center(0) > -0.125))
                     face->set_boundary_id(7);
@@ -328,15 +307,21 @@ Step6<dim>::Step6(const unsigned int subdomain)
             }
 
     } else
-        Assert (false, ExcInternalError()); // always aborts the program
+        Assert (false, ExcInternalError());
 
 
-    setup_system(); //makes solution of the right size (n_dofs) and distributes dofs
-                    // so after setup_system(), we can make a FEFieldFunction (using solution and dof_handler)
-                    // equivalent to the zero function (because solution is iniitalized with a value of zero by default)
-                    // and make this FEFieldfunction the first entry of each solutionfunction_vector:
+    // Setting the boundary_ids as above is clearly a lengthy, tedious, and bug-prone process that makes the program,
+    // as it currently stands, combersome to use. This process will eventually be replaced this with an automated
+    // method, but I needed a highly controlled system running before playing with this feature.
 
-//Make the first element in each solutionfunction_vector the zero_function:
+
+    setup_system();
+
+    // (<code> setup_system) makes (<code> solution) of the right size, (<code> n_dofs), and distributes dofs.
+    // So after (<code> setup_system), we can make a FEFieldFunction (using solution and dof_handler) equivalent
+    // to the zero function (because solution is initialized with a value of zero by default) and make this
+    // FEFieldfunction the first entry of each solutionfunction_vector:
+
     std::unique_ptr<Functions::FEFieldFunction<dim>> zero_function =
             std::make_unique<Functions::FEFieldFunction<dim>>(dof_handler, solution);
     solutionfunction_vector.emplace_back (std::move(zero_function));
@@ -344,7 +329,9 @@ Step6<dim>::Step6(const unsigned int subdomain)
 }
 
 
+// @sect4{Step6::setup_system}
 
+// This function remains identical to the original.
 
 template <int dim>
 void Step6<dim>::setup_system()
@@ -375,32 +362,26 @@ void Step6<dim>::setup_system()
 }
 
 
+// @sect4{Step6::get_fe_function}
 
+// As previously mentioned, an additional function is needed to get the appropriate solution for each edge and apply it
+// as an (<code> FEFieldFunction) boundary condition for the subdomain bounded by the given edge. This association
+// between subdomains, which subdomain solution is imposed as a boundary condition to which edge, is also done
+// explicitly here, but will be replaced with an automated system.
 
-//Need function to get the appropriate solution fe_function:
 template<int dim>
 Functions::FEFieldFunction<dim> &
         Step6<dim>::get_fe_function(unsigned int boundary_id, unsigned int s, std::string method)
 {
 
-    // get other subdomain id
+    // Get other subdomain id
     types::subdomain_id relevant_subdomain;
 
-// ----------------------------------------------------------------------------------------------------------------
-// 2 subdomain case:
-/*
-    if (boundary_id == 1){
-        relevant_subdomain = 0;
-    } else if (boundary_id == 2){
-        relevant_subdomain = 1;
-    } else
-        Assert (false, ExcInternalError()); // always aborts the program
-*/
 
-// ----------------------------------------------------------------------------------------------------------------
+    // Boundary conditions for multiplicative and additive Schwarz differ, so we need to check which method the
+    // user would like to use:
 
-
-//4 subdomain case:
+    // @sect5{Multiplicative Schwarz}
 
     if (method == "Multiplicative") {
 
@@ -419,7 +400,7 @@ Functions::FEFieldFunction<dim> &
                 relevant_subdomain = 3;
 
             else //boundary_id == 0
-            Assert (false, ExcInternalError()); //make sure to only use get_fe_function on nonzero boundary_ids!
+            Assert (false, ExcInternalError());
 
 
         } else if (s == 1) {
@@ -475,9 +456,9 @@ Functions::FEFieldFunction<dim> &
             Assert (false, ExcInternalError());
 
 
-        } else Assert (false, ExcInternalError()); // always aborts the program
+        } else Assert (false, ExcInternalError());
 
-        //For debugging:
+
         std::cout << "              The BC function for subdomain " << s << " on gamma" << boundary_id <<
                   " is from subdomain " << relevant_subdomain << std::endl;
 
@@ -490,19 +471,31 @@ Functions::FEFieldFunction<dim> &
     //ADDITIVE//--------------------------------------------------------------------------------------------------------
 
 
+
+
+
+
+
+    // @sect5{Additive Schwarz}
+
     } else if (method == "Additive") {
 
-    //For Additive Schwarz, we impose the solution from the neighboring subdomains' previous cycle as the
-    // BC of the current subdomain, so we retrieve the second to last entry of solutionfunction_vector if the solution
-    // has already been computed on the relevant_subdomain in the current cycle and retrieve the last entry of
-    // relevant_subdomain if the solution on the relevant_subdomain has not yet been computed in the current cycle.
-    // We know that, if we are solving on subdomain_i, then sundomain_k k<i have been solved in the current cycle
-    //                                                      subdomain_k k>i have not been solved in the current cycle.
+    // For Additive Schwarz, we impose as a boundary condition a linear combination of the solutions from
+    // subdomains overlapping at any given edge. These solutions are all from the previous cycle, so we retrieve
+    // the second to last entry of (<code>solution_vector) if the solution has already been computed on the
+    // (<code>relevant_subdomain) in the current cycle and retrieve the last entry of (<code>relevant_subdomain)'s
+    // (<code>solution_vector) if the solution on the relevant_subdomain has not yet been computed in the current cycle.
+    // We know that, if we are solving on subdomain_i, then subdomain_k for k<i have been solved in the current cycle
+    // while subdomain_k for k>i have not been solved in the current cycle.
     // We also must consider the fact that the second to last entry of solutionfunction_vector may not exist; namely
     // when the size of solutionfunction_vector is 1. In this case, we need to retrieve its only entry, which happens
     // to be the vector's last entry. We can retrieve this as before (with .back()).
+    // Because we must impose a linear combination of these solutions as a boundary condition, we use their
+    // (<code>solution_vectors) rather than their (<code>solutionfunction_vectors) because (<code>solution_vector) is
+    // a vector of Vectors, which is easier to algebraically manipulate than a vector of FEFieldFunctions.
 
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Inaccurate implementation: BC entirely retrieved from neighboring subdomain rather than being a weighted average
     // of all solutions from subdomains in the overlapping region:
@@ -533,6 +526,9 @@ Functions::FEFieldFunction<dim> &
 
 
     //Incomplete correction below:
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         std::vector<int> relevant_subdomains;
 
@@ -619,15 +615,25 @@ Functions::FEFieldFunction<dim> &
 
 
             else {// subdomain_objects[relevant_subdomain] -> solution_vector.size() > 1
-                if (relevant_subdomain >= s) //then solution for relevant_subdomain has not been computed in the current cycle,
+                if (relevant_subdomain >= s)
+
+                    //then solution for relevant_subdomain has not been computed in the current cycle,
                     // so retrieving the last element of its solution_vector is retrieving its
                     // solution from the previous cycle
+
                     overlapping_solutions.push_back(subdomain_objects[relevant_subdomains[i]]->solution_vector.back());
 
-                else // (relevant_subdomain < s) { //then solution for relevant_subdomain has been computed in the current cycle,
-                    // so retrieving the second to last element of its solution_vector is
+
+
+                else
+
+                    // Then relevant_subdomain < s and the solution for relevant_subdomain has been computed
+                    // in the current cycle, so retrieving the second to last element of its solution_vector is
                     // retrieving its solution from the previous cycle
+
                     overlapping_solutions.push_back(subdomain_objects[relevant_subdomains[i]]->solution_vector.rbegin()[1]);
+
+
 
             //When solving subdomains in parallel for each cycle, the above if-else is no longer necessary. No matter
             //what, we only need the last entry of the solution_vector belonging to each of the entries of the
@@ -650,7 +656,7 @@ Functions::FEFieldFunction<dim> &
         Functions::FEFieldFunction<2> fe_function (dof_handler, solution_in_overlap);
         return fe_function;
 
-    //------------------------------------------------------------------------------------------------------------------
+
 
 
     } else { //Neither Multiplicative Schwarz nor Additive Schwarz were chosen as the solving method
@@ -663,6 +669,17 @@ Functions::FEFieldFunction<dim> &
 }
 
 
+
+
+
+
+// @sect4{Step6::assemble_system}
+
+// Next, we actually impose the appropriate solutions as boundary conditions on their appropriate edges, which is
+// done with VectorTools::interpolate_boundary_values. We specify the function that will be applied as a boundary
+// condition on the nonzero boundary_ids using get_fe_function, but on the boundaries with boudary_id of zero by
+// default (the edges on the exterior of the entire domain) we impose the homogenous direchlet boundary condition
+// by using Functions::ZeroFunction<dim>() as the appropriate boundary function.
 
 
 template <int dim>
@@ -717,28 +734,6 @@ void Step6<dim>::assemble_system(unsigned int s, std::string method)
                                              Functions::ZeroFunction<dim>(),
                                              boundary_values);
 
-// ----------------------------------------------------------------------------------------------------------------
-//2 subdomain case:
-/*
-
-     if (s==0) {
-         VectorTools::interpolate_boundary_values(dof_handler,
-                                                  2,
-                                                  get_fe_function(1, s, method),
-                                                  boundary_values);
-
-     } else { //s=1
-         VectorTools::interpolate_boundary_values(dof_handler,
-                                                  1,
-                                                  get_fe_function(1, s, method),
-                                                  boundary_values);
-     }
-
-*/
-
-// ----------------------------------------------------------------------------------------------------------------
-
-//4 subdomain case:
 
     //Impose boundary conditions on edges of subdomain0 with nonzero boundary_ids
     if (s == 0){
@@ -809,6 +804,7 @@ void Step6<dim>::assemble_system(unsigned int s, std::string method)
                                                  get_fe_function(7, s, method),
                                                  boundary_values);
 
+    //Impose boundary conditions on edges of subdomain3 with nonzero boundary_ids
     } else if (s == 3){
         VectorTools::interpolate_boundary_values(dof_handler,
                                                  2,
@@ -831,58 +827,7 @@ void Step6<dim>::assemble_system(unsigned int s, std::string method)
                                                  boundary_values);
 
     } else
-    Assert (false, ExcInternalError()); // always aborts the program
-
-    //Want to modify interpolate_boundary_values() slightly so that it checks if the given boundary_id
-    // is present on a boundary of the current subdomain:
-    //      if so: apply the given boundary_function
-    //      if not: do nothing
-    // so that we can run the following, without need to check which subdomain we are on:
-
-
-/*
-
-    VectorTools::interpolate_boundary_values(dof_handler,
-                                             1,
-                                             get_fe_function(1, s, method),
-                                             boundary_values);
-
-    VectorTools::interpolate_boundary_values(dof_handler,
-                                             2,
-                                             get_fe_function(2, s, method),
-                                             boundary_values);
-
-    VectorTools::interpolate_boundary_values(dof_handler,
-                                             3,
-                                             get_fe_function(3, s, method),
-                                             boundary_values);
-
-    VectorTools::interpolate_boundary_values(dof_handler,
-                                             4,
-                                             get_fe_function(4, s, method),
-                                             boundary_values);
-
-    VectorTools::interpolate_boundary_values(dof_handler,
-                                             5,
-                                             get_fe_function(5, s, method),
-                                             boundary_values);
-
-    VectorTools::interpolate_boundary_values(dof_handler,
-                                             6,
-                                             get_fe_function(6, s, method),
-                                             boundary_values);
-    VectorTools::interpolate_boundary_values(dof_handler,
-                                             7,
-                                             get_fe_function(7, s, method),
-                                             boundary_values);
-
-    VectorTools::interpolate_boundary_values(dof_handler,
-                                             8,
-                                             get_fe_function(8, s, method),
-                                             boundary_values);
-
-    ... or better, with a loop going through all nonzero boundary_id values
-*/
+    Assert (false, ExcInternalError());
 
 
     MatrixTools::apply_boundary_values(boundary_values,
@@ -894,7 +839,9 @@ void Step6<dim>::assemble_system(unsigned int s, std::string method)
 }
 
 
+// @sect4{Step6::solve}
 
+// The same solver as before is used because this is not the focus of this modified program.
 
 template <int dim>
 void Step6<dim>::solve()
@@ -906,10 +853,12 @@ void Step6<dim>::solve()
     solver.solve(system_matrix, solution, system_rhs, preconditioner);
     constraints.distribute(solution);
 
-//Store solution in vector that can be retrieved elsewhere:
+// Now we can store solution in vector that can be retrieved elsewhere. As previously mentioned, it will be helpful to
+// store the solution as a Vector for algebraic manipulation required in the implementation of additive Schwarz.
     solution_vector.push_back(solution);
 
-//Store solution as function that can be retrieved elsewhere:
+// Here we store the solution as function that can be retrieved elsewhere. Namely, this will be used in the
+// implementation of multiplicative Schwarz.
     std::unique_ptr<Functions::FEFieldFunction<dim>> solutionfunction_pointer =
             std::make_unique<Functions::FEFieldFunction<dim>>(dof_handler, solution);
     solutionfunction_vector.emplace_back (std::move(solutionfunction_pointer));
@@ -921,6 +870,7 @@ void Step6<dim>::solve()
 
 
 
+// @sect4{Step6::refine_grid}
 
 template <int dim>
 void Step6<dim>::refine_grid()
@@ -942,6 +892,7 @@ void Step6<dim>::refine_grid()
 
 
 
+// @sect4{Step6::output_results}
 
 template <int dim>
 void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s, std::string method) const
@@ -1048,12 +999,13 @@ void Step6<dim>::output_results(const unsigned int cycle, const unsigned int s, 
 }
 
 
+// @sect4{Step6::run}
 
+// The (<code> run) function remains nearly identical; some of the functions it calls merely needed extra arguments.
 
 template <int dim>
 void Step6<dim>::run(const unsigned int cycle, const unsigned int s, std::string method) {
 
-    //For debugging purposes only:
     std::cout << "Cycle:  " << cycle << std::endl;
     std::cout << "Subdomain:  " << s << std::endl;
 
@@ -1075,7 +1027,7 @@ void Step6<dim>::run(const unsigned int cycle, const unsigned int s, std::string
 
     assemble_system(s, method);
 
-        //For debugging purposes only:
+
         std::cout << "   Number of active cells:       "
                   << triangulation.n_active_cells() << std::endl;
         std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs() << std::endl;
@@ -1094,6 +1046,8 @@ int main()
     try
     {
 
+        // We now construct each subdomain problem and store them all in a vector to solve iteratively.
+
         std::vector<std::shared_ptr<Step6<2>>> subdomain_problems;
 
         subdomain_problems.push_back (std::make_shared<Step6<2>> (0));
@@ -1108,11 +1062,12 @@ int main()
             subdomain_problems[s] -> set_all_subdomain_objects(subdomain_problems);
         }
 
-        //Choose whether we use Multiplicative or Additive Schwarz to solve
+        // Choose whether we use Multiplicative or Additive Schwarz to solve
         std::string method;
         std::cout << "Which Schwarz method would you like to use to solve? (Multiplicative or Additive)" << std::endl;
         std::cin >> method;
 
+        // Now we can actually solve each subdomain problem
         for (unsigned int cycle=1; cycle<10; ++cycle)
             for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
                 subdomain_problems[s] -> run(cycle, s, method);
