@@ -530,20 +530,25 @@ Functions::FEFieldFunction<dim> &
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+
+    // We have to define the set R from () in the introduction. Here, we implement this set as a vector,
+    // (<code> relevant_subdomains).
+
         std::vector<int> relevant_subdomains;
 
         if (s == 0) {
             if (boundary_id == 2) {
-                relevant_subdomains = {1, 0};
+                //relevant_subdomains = {1, 0}; //exclude s to match formulas
+                relevant_subdomains = {1};
 
             } else if (boundary_id == 6) {
-                relevant_subdomains = {2,0,1,3};
+                relevant_subdomains = {2,1,3};
 
             } else if (boundary_id == 8) {
-                relevant_subdomains = {3,0,1,2};
+                relevant_subdomains = {3,1,2};
 
             } else if (boundary_id == 4) {
-                relevant_subdomains = {3,0,1,2};
+                relevant_subdomains = {3,1,2};
 
             } else //boundary_id == 0
             Assert (false, ExcInternalError());
@@ -551,16 +556,16 @@ Functions::FEFieldFunction<dim> &
 
         } else if (s == 1) {
             if (boundary_id == 1) {
-                relevant_subdomains = {0,1};
+                relevant_subdomains = {0};
 
             } else if (boundary_id == 5) {
-                relevant_subdomains = {0,1,2,3};
+                relevant_subdomains = {0,2,3};
 
             } else if (boundary_id == 8) {
-                relevant_subdomains = {3,0,1,2};
+                relevant_subdomains = {3,0,2};
 
             } else if (boundary_id == 4) {
-                relevant_subdomains = {2,1};
+                relevant_subdomains = {2};
 
             } else //boundary_id == 0
                 Assert (false, ExcInternalError());
@@ -569,16 +574,16 @@ Functions::FEFieldFunction<dim> &
         } else if (s == 2) {
 
             if (boundary_id == 3)
-                relevant_subdomains = {1,2};
+                relevant_subdomains = {1};
 
             else if (boundary_id == 5)
-                relevant_subdomains = {0,1,2,3};
+                relevant_subdomains = {0,1,3};
 
             else if (boundary_id == 7)
-                relevant_subdomains = {1,0,2,3};
+                relevant_subdomains = {1,0,3};
 
             else if (boundary_id == 1)
-                relevant_subdomains = {3,2};
+                relevant_subdomains = {3};
 
             else //boundary_id == 0
             Assert (false, ExcInternalError());
@@ -587,16 +592,16 @@ Functions::FEFieldFunction<dim> &
         } else if (s == 3) {
 
             if (boundary_id == 3)
-                relevant_subdomains = {0,3};
+                relevant_subdomains = {0};
 
             else if (boundary_id == 6)
-                relevant_subdomains = {2,0,1,3};
+                relevant_subdomains = {2,0,1};
 
             else if (boundary_id == 7)
-                relevant_subdomains = {1,0,2,3};
+                relevant_subdomains = {1,0,2};
 
             else if (boundary_id == 2)
-                relevant_subdomains = {2,3};
+                relevant_subdomains = {2};
 
             else //boundary_id == 0
             Assert (false, ExcInternalError());
@@ -605,6 +610,16 @@ Functions::FEFieldFunction<dim> &
         } else Assert (false, ExcInternalError());
 
 
+    // Now we have to retrieve $\tilde{u}_{i}^{\{k+1\}}$ for i $\in$ R and $\tilde{u}_{s}^{\{k\}}$. When solving
+    // in parallel, these are the last entries of subdomain_objects[relevant_subdomains[i]]->solution_vector and the
+    // second to last entry of subdomain_objects[s]->solution_vector respectively.
+    // When not solving in parallel, we must consider if we have solved on relevant_subdomains[i] during the current
+    // cycle. If relevant_subdomains[i] >= s, the solution on this subdomain has not yet been computed in this cycle,
+    // so we retrieve the last entry of relevant_subdomains[i]'s solution_vector. Otherwise,
+    // relevant_subdomains[i] < s and the solution has been computed on this subdomain in the current cycle, so we
+    // must retrieve the second to last entry of relevant_subdomains[i]'s solution_vector.
+    // Whether solving in parallel or not, $\tilde{u}_{s}^{\{k\}}$ is always the last entry of
+    // subdomain_objects[s]->solution_vector at this point in time.
 
         std::vector<Vector<double>> overlapping_solutions;
 
@@ -615,7 +630,7 @@ Functions::FEFieldFunction<dim> &
 
 
             else {// subdomain_objects[relevant_subdomain] -> solution_vector.size() > 1
-                if (relevant_subdomain >= s)
+                if (relevant_subdomains[i] >= s)
 
                     //then solution for relevant_subdomain has not been computed in the current cycle,
                     // so retrieving the last element of its solution_vector is retrieving its
@@ -635,29 +650,39 @@ Functions::FEFieldFunction<dim> &
 
 
 
-            //When solving subdomains in parallel for each cycle, the above if-else is no longer necessary. No matter
-            //what, we only need the last entry of the solution_vector belonging to each of the entries of the
-            //relevant_subdomains vector.
-
             }
 
         }
 
-        //TODO: loop through all overlapping_solutions entries, resulting in an evenly weighted average of all entries
-        // of this overlapping_solutions vector.
-        Vector<double> solution_in_overlap;
-        solution_in_overlap = VectorOperation::add(1/(overlapping_solutions.size()),
-                                                  overlapping_solutions[0],
-                                                  ...
-                                                  1/(overlapping_solutions.size()),
-                                                  overlapping_solutions[overlapping_solutions.size()-1]);
+
+        // Now we need a way to evaluate each of the solutions stored in overlapping_solutions on a particular edge.
+        // We then must formulate an appropriate linear combination of these evaluated solutions to impose as a
+        // boundary condition on this particular edge.
 
 
-        Functions::FEFieldFunction<2> fe_function (dof_handler, solution_in_overlap);
+        Vector<double> solution_on_shared_edge;
+        solution_on_shared_edge = ...
+
+
+        Functions::FEFieldFunction<2> fe_function (dof_handler, solution_on_shared_edge);
         return fe_function;
 
 
-
+// Suggestion from Wolfgang: //////////////////////////////////////////////////////////////////////////////////////////
+        template <int dim>
+        class MyOverlappingBoundaryValues : public Function<dim> // look at Function and that FEFieldFunction is derived from it
+        {
+            virtual
+            double value (const Point<dim> &p,
+                          const unsigned int /*component*/) const
+            {
+                double sum = 0;
+                for (relevant subdomain s=0...) // figure out which part of the interface this is on
+                    sum += fe_function(...s...).value(p); // add up values of individual functions at 'p' rather than add up functions, then evaluate at 'p'
+                return sum;
+            }
+        };
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     } else { //Neither Multiplicative Schwarz nor Additive Schwarz were chosen as the solving method
         std::cout << "Error: 'Multiplicative' or 'Additive' must be chosen as the solving method" << std::endl;
