@@ -140,9 +140,15 @@ public:
 
         double solution_on_shared_edge = 0;
 
-        //First portion of my additive Schwarz algorithm for subdomains:
-        solution_on_shared_edge += (1 - tau*(overlapping_solution_functions.size())) *
-                                   (*subdomain_objects[s]->solutionfunction_vector.rbegin()[1]).value(p);
+        if (subdomain_objects[s]->solutionfunction_vector.size() == 1) {
+            solution_on_shared_edge += (1 - tau * (overlapping_solution_functions.size())) *
+                                       (subdomain_objects[s]->solutionfunction_vector.back())->value(p);
+        } else {
+            //First portion of my additive Schwarz algorithm for subdomains:
+            // solution_on_shared_edge += (1 - tau * (overlapping_solution_functions.size())) * (subdomain_objects[s]->solutionfunction_vector.rbegin()[1])->value(p);
+            solution_on_shared_edge += (1 - tau * (overlapping_solution_functions.size())) *
+                    (subdomain_objects[s]->solutionfunction_vector[subdomain_objects[s]->solutionfunction_vector.size() - 2])->value(p);
+        }
 
 
         //Second portion of my additive Schwarz algorithm for subdomains:
@@ -587,9 +593,9 @@ Functions::FEFieldFunction<dim> &
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 */ // My implementation of this suggestion is broken up :
 //      the MyOverlappingBoundaryValues class is at the very top of this program
-//      the get_overlapping_solution_functions function is the very last function defined in this program
+//      the get_overlapping_solution_functions function is directly below the get_fe_function function (so immediately below this comment)
 //      the usage of get_overlapping_solution_functions is in assemble_system to impose boundary conditions
-//      the initialization of MyOverlappingBoundaryValues objects is in main()
+//      the initialization of MyOverlappingBoundaryValues objects is done in assemble_system, immediately before using objects of this type to impose BC for additive Schwarz
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -609,7 +615,7 @@ std::vector<Functions::FEFieldFunction<dim>> MyOverlappingBoundaryValues<dim>::g
     // We have to define the set R from my formula for additive Schwarz with subdomains mentioned in the introduction.
     // Here, we implement this set as a vector, (<code> relevant_subdomains).
     std::vector<int> relevant_subdomains;
-    std::vector<Functions::FEFieldFunction<dim>> overlapping_solution_functions;
+    //std::vector<Functions::FEFieldFunction<dim>> overlapping_solution_functions;
 
     if (s == 0) {
         if (boundary_id == 2) {
