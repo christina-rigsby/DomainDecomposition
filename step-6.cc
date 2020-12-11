@@ -95,8 +95,6 @@ private:
 
     std::vector<std::shared_ptr<Step6<dim>>> subdomain_objects;
 
-    const unsigned int subdomain;
-
     Triangulation<dim> triangulation;
 
     FE_Q<dim>       fe;
@@ -721,7 +719,7 @@ std::vector<Functions::FEFieldFunction<dim>> MyOverlappingBoundaryValues<dim>::g
                 // solution from the previous cycle
 
                 overlapping_solution_functions.push_back(
-                        *subdomain_objects[relevant_subdomains[i]]->solutionfunction_vector.back()); // was solution_vector!!!!!!!!!!!!!!!!!!!!!!!!
+                        *subdomain_objects[relevant_subdomains[i]]->solutionfunction_vector.back());
 
 
             } else {
@@ -731,18 +729,17 @@ std::vector<Functions::FEFieldFunction<dim>> MyOverlappingBoundaryValues<dim>::g
                 // retrieving its solution from the previous cycle
 
                 overlapping_solution_functions.push_back(
-                        *subdomain_objects[relevant_subdomains[i]]->solutionfunction_vector.rbegin()[1]); // was solution_vector!!!!!!!!!!!!!!!!!!!!!!!!
-
+                        *subdomain_objects[relevant_subdomains[i]]->solutionfunction_vector[subdomain_objects[relevant_subdomains[i]]->solutionfunction_vector.size()-2]);
             }
 
         }
 
     }
 
-    return overlapping_solution_functions; //was overlapping_solutions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+    return overlapping_solution_functions;
 
-    // Now we have overlapping_solutions, a std::vector of Vector<double>'s. So we need to:
-    //     (1) Iterate through overlapping_solutions
+    // Now we have overlapping_solution_functions, a std::vector of Vector<double>'s. So we need to:
+    //     (1) Iterate through overlapping_solution_functions
     //     (2) Compute the current element's value at a Point<dim>, which will later be provided by
     //           VectorTools::interpolate_boundary_values() at the time of imposing boundary conditions
     //           (which happens in Step6::assemble_system()
