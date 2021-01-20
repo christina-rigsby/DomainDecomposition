@@ -9,20 +9,17 @@ Using your IDE of choice (I am using CLion, available for download at https://ww
 To run the program, open a terminal and navigate to step6.cc's location (should be in dealii/examples/CopiedFolder).
 Make and run this file by typing
 ```text
-code();
 cmake . && make run
 ```
 
 Now that the file is made, you only need to type
 ```text
-code();
 make run
 ```
 to run your program with any modifications you have made in your IDE.
 
 The program output will appear in CopiedFolder as well and can be visualized with VisIT, which can be run by simply typing
 ```text
-code();
 visit
 ```
 in the terminal.
