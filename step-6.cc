@@ -138,6 +138,11 @@ private:
 //          using objects of this type to impose BC for additive Schwarz
 // The debugging process is still on-going.
 
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// begin Part I of additive Schwarz
+/*
+
+
 template <int dim>
 class MyOverlappingBoundaryValues : public Function<dim>
 {
@@ -201,6 +206,8 @@ MyOverlappingBoundaryValues<dim>::MyOverlappingBoundaryValues(
                     get_overlapping_solution_functions(boundary_id);
 }
 
+*/
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// end Part I of additive Schwarz
 
 
 // @sect4{Nonconstant coefficients}
@@ -580,6 +587,8 @@ Functions::FEFieldFunction<dim> &
 // boundary condition to which edge, is also done explicitly here, but will be
 // replaced with an automated system.
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// begin Part II of additive Schwarz
+/*
 
 template<int dim>
 std::vector<Functions::FEFieldFunction<dim>>
@@ -735,6 +744,9 @@ MyOverlappingBoundaryValues<dim>::get_overlapping_solution_functions(
 
 
 }
+
+*/
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// end Part II additive Schwarz
 
 
 // @sect4{Step6::assemble_system}
@@ -926,6 +938,9 @@ void Step6<dim>::assemble_system(const std::string method)
 
     //Impose boundary conditions for additive Schwarz
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// begin Part III additive Schwarz
+/*
+
     } else if (method == "Additive") {
 
         //Impose boundary conditions on edges of subdomain0 with nonzero
@@ -962,6 +977,8 @@ void Step6<dim>::assemble_system(const std::string method)
 
             //Impose boundary conditions on edges of subdomain1 with nonzero
             // boundary_ids
+
+
         } else if (s == 1) {
 
             MyOverlappingBoundaryValues<dim> overlapping_subdomains_1(
@@ -1057,7 +1074,8 @@ void Step6<dim>::assemble_system(const std::string method)
                                                      boundary_values);
 
         } else Assert (false, ExcInternalError());
-
+*/ 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// end Part III additive Schwarz
 
     } else { //Neither Multiplicative Schwarz nor Additive Schwarz were
         // chosen as the solving method
