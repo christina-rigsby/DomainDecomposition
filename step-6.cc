@@ -24,6 +24,7 @@
 
 #include <deal.II/base/quadrature_lib.h>
 #include <deal.II/base/timer.h>
+#include <deal.II/base/table_handler.h> //////////////////////////////////////////////////////////////////////////////// table
 
 #include <deal.II/dofs/dof_handler.h>
 #include <deal.II/dofs/dof_tools.h>
@@ -77,7 +78,7 @@ class Step6
 public:
     Step6(const unsigned int s);
 
-    void run(const unsigned int cycle, const std::string method);
+    void run(const unsigned int cycle, const std::string method, TableHandler results_table);
 
     void set_all_subdomain_objects (const std::vector<std::shared_ptr<Step6<dim>>> &objects)
     { subdomain_objects = objects; }
@@ -86,12 +87,14 @@ public:
     std::vector<std::unique_ptr<Functions::FEFieldFunction<dim>>> solutionfunction_vector;
 
 
+
 private:
     void setup_system();
     void assemble_system(const std::string method);
     Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id);
-    void solve();
-    void refine_grid();
+    void solve(TableHandler results_table);
+    void refine_grid(TableHandler results_table);
+
     void output_results(const unsigned int cycle) const;
 
     const unsigned int s;
@@ -1101,7 +1104,7 @@ void Step6<dim>::assemble_system(const std::string method)
 // modified program.
 
 template <int dim>
-void Step6<dim>::solve()
+void Step6<dim>::solve(TableHandler results_table)
 {
     SolverControl solver_control(1000, 1e-12);
     SolverCG<Vector<double>> solver(solver_control);
@@ -1119,6 +1122,7 @@ void Step6<dim>::solve()
 
     std::cout << "  max solution value=" << solution.linfty_norm()
               << std::endl;
+    results_table.add_value("MaxSolValue", solution.linfty_norm()); //////////////////////////////////////////table
 
 }
 
@@ -1127,7 +1131,7 @@ void Step6<dim>::solve()
 // @sect4{Step6::refine_grid}
 
 template <int dim>
-void Step6<dim>::refine_grid()
+void Step6<dim>::refine_grid(TableHandler results_table)
 {
     Vector<float> estimated_error_per_cell(triangulation.n_active_cells());
     KellyErrorEstimator<dim>::estimate(dof_handler,
@@ -1138,6 +1142,7 @@ void Step6<dim>::refine_grid()
 
     std::cout << " Max error present:" << estimated_error_per_cell.linfty_norm() <<
     std::endl;
+    results_table.add_value("MaxError", estimated_error_per_cell.linfty_norm()); ///////////////////////////////////table
 
     GridRefinement::refine_and_coarsen_fixed_number(triangulation,
                                                     estimated_error_per_cell,
@@ -1192,25 +1197,30 @@ void Step6<dim>::output_results(const unsigned int cycle) const
 // merely needed extra arguments.
 
 template <int dim>
-void Step6<dim>::run(const unsigned int cycle, const std::string method) {
+void Step6<dim>::run(const unsigned int cycle, const std::string method, TableHandler results_table) {
 
     std::cout << "Cycle:  " << cycle << std::endl;
     std::cout << "Subdomain:  " << s << std::endl;
 
     std::cout << "   Number of active cells:       "
               << triangulation.n_active_cells() << std::endl;
+
     std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
               << std::endl;
 
-    refine_grid();
+    refine_grid(results_table);
 
     setup_system();
 
     std::cout << " After calling refine_grid():" << std::endl;
+
     std::cout << "   Number of active cells:       "
               << triangulation.n_active_cells() << std::endl;
+    results_table.add_value("ActiveCells", triangulation.n_active_cells()); ////////////////////////////////// table
+
     std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
               << std::endl;
+    results_table.add_value("DoF", dof_handler.n_dofs());  /////////////////////////////////////////////////// table
 
 
     //assemble_system(s, method);
@@ -1222,7 +1232,7 @@ void Step6<dim>::run(const unsigned int cycle, const std::string method) {
         std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs() <<
         std::endl;
 
-    solve();
+    solve(results_table);
 
     output_results(cycle);
 
@@ -1257,11 +1267,13 @@ int main()
 
         std::cin >> method;
 
+        TableHandler results_table; //////////////////////////////////////////////////////////////////////////////////// table
         Timer timer;
+
         // Now we can actually solve each subdomain problem
         for (unsigned int cycle=1; cycle<10; ++cycle)
             for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
-                subdomain_problems[s] -> run(cycle, method);
+                subdomain_problems[s] -> run(cycle, method, results_table);
 
                 std::cout << "After solving on subdomain " << s <<
                 " during cycle " << cycle << ":\n" <<
@@ -1270,14 +1282,21 @@ int main()
 
                 std::cout << "        Elapsed wall time: " << timer.wall_time() <<
                 " seconds.\n";
+
+
+                results_table.add_value("Cycle", cycle);                      ////////////////////////////////////// table
+                results_table.add_value("Subdomain", s);                      ////////////////////////////////////// table
+                results_table.add_value("CPUtimeTotal", timer.cpu_time());    ////////////////////////////////////// table
+                results_table.add_value("WalltimeTotal", timer.wall_time());  ////////////////////////////////////// table
+
             }
 
         timer.stop();
-        std::cout << "Elapsed CPU time: " << timer.cpu_time() << " seconds.\n";
-        std::cout << "Elapsed wall time: " << timer.wall_time() << " seconds.\n";
-
         timer.reset();
 
+        std::ofstream out_file("number_table.tex");
+        results_table.write_tex(out_file);
+        out_file.close();
 
     }
     catch (std::exception &exc)
