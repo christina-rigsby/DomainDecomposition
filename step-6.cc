@@ -143,21 +143,26 @@ private:
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// begin Part I of additive Schwarz
-/*
 
+
+// MyOverlappingBoundaryValues acts as a blackbox taking in information and outputting the global solution at any given
+// point in our domain. More specifically, we must explicitly provide s, boundary_id, and subdomain_objects to create
+// a MyOverlappingBoundaryValues object, but do not explicitly provide the points at which we want to compute the
+// global solution. These points are provided by interpolate_boundary_values(), which uses the specified boundary_id
+// and returns points lying on the edge corresponding to this boundary_id.
 
 template <int dim>
 class MyOverlappingBoundaryValues : public Function<dim>
 {
 public:
     MyOverlappingBoundaryValues (unsigned int s, unsigned int boundary_id,
-            std::vector<std::shared_ptr<Step6<dim>>> subdomain_objects);
-    std::vector<Functions::FEFieldFunction<dim>> overlapping_solution_functions;
+            std::vector<std::shared_ptr<Step6<dim>>> subdomain_objects);          //to create a MyOverlappingBoundaryValues object, we have to provide s, boundary_id, and subdomain_objects
+    std::vector<Functions::FEFieldFunction<dim>> overlapping_solution_functions;  //how we actually define this vector is provided in the MyOverlappingBoundaryValues constructor (overlapping_solution_functions = get_overlapping_solution_functions(boundary_id))
     std::vector<std::shared_ptr<Step6<dim>>> subdomain_objects;
     const unsigned int s;
 
     virtual double
-    value (const Point<dim> &p,
+    value (const Point<dim> &p,                                                  //again, these points are provided by interpolate_boundary_values()
            const unsigned int component = 0) const
     {
         double tau = 0.1;
@@ -166,19 +171,28 @@ public:
         // goes to the equivalent of the old global solution present on the current
         // subdomain, s.
 
+        //Note that, comparing the formula to the code:
+        //      R = relevant_subdomains
+        //      |R| = relevant_subdomains.size() = overlapping_solution_functions.size() (we do not have access to relevant_subdomains, but DO have access to overlapping_solution_functions)
+        //      $\tilde{u}_s = subdomain s's previous solutionfunction evaluated along the particular edge of interest (edge of interest defined by points 'p' given by interpolate_boundary_values())
+        //                                  (previous solutionfunction meaning the last entry of solutionfunction_vector if it only has one entry OR
+        //                                                                     the second to last entry if solutionfunction_vector has two or more entries)
+        //                   = subdomain_objects[s]->solutionfunction_vector.back())->value(p)                                                         if subdomain_objects[s]->solutionfunction_vector.size() == 1   OR
+        //                     subdomain_objects[s]->solutionfunction_vector[subdomain_objects[s]->solutionfunction_vector.size() - 2])->value(p)      if subdomain_objects[s]->solutionfunction_vector.size() >= 2
+
         double solution_on_shared_edge = 0;
 
+        //First portion of my additive Schwarz algorithm for subdomains:
         if (subdomain_objects[s]->solutionfunction_vector.size() == 1) {
-            solution_on_shared_edge += (1 - tau * (overlapping_solution_functions.size())) *
-                    (subdomain_objects[s]->solutionfunction_vector.back())->value(p);
+            solution_on_shared_edge += (1 - tau * (overlapping_solution_functions.size())+1) *
+                    (subdomain_objects[s]->solutionfunction_vector.back())->value(p); //accessing last entry
 
         } else {
-            //First portion of my additive Schwarz algorithm for subdomains:
             Assert (subdomain_objects[s]->solutionfunction_vector.size() >= 2,
                     ExcInternalError());
-            solution_on_shared_edge += (1 - tau * (overlapping_solution_functions.size())) *
+            solution_on_shared_edge += (1 - tau * (overlapping_solution_functions.size()+1)) *
                     (subdomain_objects[s]->solutionfunction_vector[
-                            subdomain_objects[s]->solutionfunction_vector.size() - 2])
+                            subdomain_objects[s]->solutionfunction_vector.size() - 2])  //accessing second to last entry
                             ->value(p);
 
         }
@@ -209,7 +223,7 @@ MyOverlappingBoundaryValues<dim>::MyOverlappingBoundaryValues(
                     get_overlapping_solution_functions(boundary_id);
 }
 
-*/
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// end Part I of additive Schwarz
 
 
@@ -591,7 +605,7 @@ Functions::FEFieldFunction<dim> &
 // replaced with an automated system.
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// begin Part II of additive Schwarz
-/*
+
 
 template<int dim>
 std::vector<Functions::FEFieldFunction<dim>>
@@ -615,7 +629,7 @@ MyOverlappingBoundaryValues<dim>::get_overlapping_solution_functions(
             relevant_subdomains = {3,1,2};
 
         } else if (boundary_id == 4) {
-            relevant_subdomains = {3,1,2};
+            relevant_subdomains = {3};
 
         } else //boundary_id == 0
         Assert (false, ExcInternalError());
@@ -706,7 +720,9 @@ MyOverlappingBoundaryValues<dim>::get_overlapping_solution_functions(
                     solutionfunction_vector.back());
 
         } else {
-            Assert (subdomain_objects[s]->solutionfunction_vector.size() >= 2,
+            //Assert (subdomain_objects[s]->solutionfunction_vector.size() >= 2,
+            //        ExcInternalError());
+            Assert (subdomain_objects[relevant_subdomains[i]]->solutionfunction_vector.size() >= 2,
                     ExcInternalError());
 
             if (relevant_subdomains[i] >= s) {
@@ -723,6 +739,8 @@ MyOverlappingBoundaryValues<dim>::get_overlapping_solution_functions(
                 // has been computed in the current cycle, so retrieving the second to
                 // last element of its solutionfunction_vector is retrieving its
                 // solution from the previous cycle
+                Assert (relevant_subdomains[i] < s,
+                        ExcInternalError());
                 overlapping_solution_functions.push_back(
                         *subdomain_objects[relevant_subdomains[i]]->
                         solutionfunction_vector[subdomain_objects[
@@ -748,7 +766,7 @@ MyOverlappingBoundaryValues<dim>::get_overlapping_solution_functions(
 
 }
 
-*/
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// end Part II additive Schwarz
 
 
@@ -944,6 +962,8 @@ void Step6<dim>::assemble_system(const std::string method)
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// begin Part III additive Schwarz
 /*
 
+
+
     } else if (method == "Additive") {
 
         //Impose boundary conditions on edges of subdomain0 with nonzero
@@ -1077,7 +1097,8 @@ void Step6<dim>::assemble_system(const std::string method)
                                                      boundary_values);
 
         } else Assert (false, ExcInternalError());
-*/ 
+*/
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// end Part III additive Schwarz
 
     } else { //Neither Multiplicative Schwarz nor Additive Schwarz were
