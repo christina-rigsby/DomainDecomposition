@@ -78,7 +78,7 @@ class Step6
 public:
     Step6(const unsigned int s);
 
-    void run(const unsigned int cycle, const std::string method, TableHandler results_table);
+    void run(const unsigned int cycle, TableHandler results_table);
 
     void set_all_subdomain_objects (const std::vector<std::shared_ptr<Step6<dim>>> &objects)
     { subdomain_objects = objects; }
@@ -90,7 +90,7 @@ public:
 
 private:
     void setup_system();
-    void assemble_system(const std::string method);
+    void assemble_system();
     Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id);
     void solve(TableHandler results_table);
     void refine_grid(TableHandler results_table);
@@ -114,32 +114,6 @@ private:
 
 
 };
-
-// @sect3{The (<code>MyOverlappingBoundaryValues) class template}
-
-// We need to provide interpolate_boundary_values() in Step6::assemble_system a way to
-// compute the value to impose as a boundary condition for additive Schwarz. Additive
-// Schwarz does not just take one subdomain's solution as the boundary condition on an
-// egde as in multiplicative Schwarz; it uses a linear combination of multiple solutions.
-// We cannot provide this as a function because the solutions from each subdomain are
-// defined on separate triangulations with their own dof_handlers Instead, we can
-// provide a way for the boundary condition to be directly computed from these separate
-// solutions when given any point in the overlapping region of their domain. In
-// assemble_system(), interpolate_boundary_values() provides the Point<dim> to the
-// MyOverlappingBoundaryValues object to evaluate the value of the boundary condition
-// for that particular point.
-
-// My implementation of Additive Schwarz is broken up in the following way:
-//      - the MyOverlappingBoundaryValues class immediately below
-//      - the get_overlapping_solution_functions function is directly below the
-//          get_fe_function function used to get the solutions to impose as
-//          boundary conditions.
-//      - the usage of get_overlapping_solution_functions() is in assemble_system()
-//          to impose boundary conditions
-//      - the initialization of MyOverlappingBoundaryValues objects is done in
-//          assemble_system(), immediately before
-//          using objects of this type to impose BC for additive Schwarz
-// The debugging process is still on-going.
 
 
 // @sect4{Nonconstant coefficients}
@@ -511,29 +485,20 @@ Functions::FEFieldFunction<dim> &
 
 }
 
-// @sect4{MyOverlappingBoundaryValues<dim>::get_overlapping_solution_functions}
-
-// Retrieves the appropriate (<code> FEFieldFunction) functions to be imposed as a
-// boundary conditions in the additive Schwarz algorithm.
-// This association between subdomains, which subdomain solution is imposed as a
-// boundary condition to which edge, is also done explicitly here, but will be
-// replaced with an automated system.
-
 
 // @sect4{Step6::assemble_system}
 
 // Next, we actually impose the appropriate solutions as boundary conditions on their
 // appropriate edges, which is done with VectorTools::interpolate_boundary_values.
 // We specify the function that will be applied as a boundary condition on the nonzero
-// boundary_ids using get_fe_function for multiplicative Schwarz and
-// get_overlapping_solution_functions for additive Schwarz. but on the boundaries
+// boundary_ids using get_fe_function for multiplicative Schwarz but on the boundaries
 // with boudary_id of zero by default (the edges on the exterior of the entire domain)
 // we impose the homogenous Direchlet boundary condition by using
 // Functions::ZeroFunction<dim>() as the appropriate boundary function.
 
 
 template <int dim>
-void Step6<dim>::assemble_system(const std::string method)
+void Step6<dim>::assemble_system()
 {
     system_matrix = 0;
     system_rhs = 0;
@@ -586,134 +551,119 @@ void Step6<dim>::assemble_system(const std::string method)
             Functions::ZeroFunction<dim>(),
             boundary_values);
 
+    //Impose boundary conditions on edges of subdomain0 with nonzero
+    // boundary_ids
+    if (s == 0) {
 
-    //Impose boundary conditions for multiplicative Schwarz
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                2,
+                get_fe_function(2),
+                boundary_values);
 
-    if (method == "Multiplicative") {
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                4,
+                get_fe_function(4),
+                boundary_values);
+
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                6,
+                get_fe_function(6),
+                boundary_values);
+
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                8,
+                get_fe_function(8),
+                boundary_values);
 
 
-        //Impose boundary conditions on edges of subdomain0 with nonzero
+    //Impose boundary conditions on edges of subdomain1 with nonzero
+    // boundary_ids
+    } else if (s == 1) {
+
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                1,
+                get_fe_function(1),
+                boundary_values);
+
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                4,
+                get_fe_function(4),
+                boundary_values);
+
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                5,
+                get_fe_function(5),
+                boundary_values);
+
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                8,
+                get_fe_function(8),
+                boundary_values);
+
+    //Impose boundary conditions on edges of subdomain2 with nonzero
+    // boundary_ids
+    } else if (s == 2) {
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                1,
+                get_fe_function(1),
+                boundary_values);
+
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                3,
+                get_fe_function(3),
+                boundary_values);
+
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                5,
+                get_fe_function(5),
+                boundary_values);
+
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                7,
+                get_fe_function(7),
+                boundary_values);
+
+        //Impose boundary conditions on edges of subdomain3 with nonzero
         // boundary_ids
-        if (s == 0) {
+    } else if (s == 3) {
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                2,
+                get_fe_function(2),
+                boundary_values);
 
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    2,
-                    get_fe_function(2),
-                    boundary_values);
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                3,
+                get_fe_function(3),
+                boundary_values);
 
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    4,
-                    get_fe_function(4),
-                    boundary_values);
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                6,
+                get_fe_function(6),
+                boundary_values);
 
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    6,
-                    get_fe_function(6),
-                    boundary_values);
+        VectorTools::interpolate_boundary_values(
+                dof_handler,
+                7,
+                get_fe_function(7),
+                boundary_values);
 
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    8,
-                    get_fe_function(8),
-                    boundary_values);
+    } else Assert (false, ExcInternalError());
 
-
-        //Impose boundary conditions on edges of subdomain1 with nonzero
-        // boundary_ids
-        } else if (s == 1) {
-
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    1,
-                    get_fe_function(1),
-                    boundary_values);
-
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    4,
-                    get_fe_function(4),
-                    boundary_values);
-
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    5,
-                    get_fe_function(5),
-                    boundary_values);
-
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    8,
-                    get_fe_function(8),
-                    boundary_values);
-
-        //Impose boundary conditions on edges of subdomain2 with nonzero
-        // boundary_ids
-        } else if (s == 2) {
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    1,
-                    get_fe_function(1),
-                    boundary_values);
-
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    3,
-                    get_fe_function(3),
-                    boundary_values);
-
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    5,
-                    get_fe_function(5),
-                    boundary_values);
-
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    7,
-                    get_fe_function(7),
-                    boundary_values);
-
-            //Impose boundary conditions on edges of subdomain3 with nonzero
-            // boundary_ids
-        } else if (s == 3) {
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    2,
-                    get_fe_function(2),
-                    boundary_values);
-
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    3,
-                    get_fe_function(3),
-                    boundary_values);
-
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    6,
-                    get_fe_function(6),
-                    boundary_values);
-
-            VectorTools::interpolate_boundary_values(
-                    dof_handler,
-                    7,
-                    get_fe_function(7),
-                    boundary_values);
-
-        } else Assert (false, ExcInternalError());
-        
-
-    } else { //Neither Multiplicative Schwarz nor Additive Schwarz were
-        // chosen as the solving method
-        std::cout <<
-        "Error: 'Multiplicative' or 'Additive' must be chosen as the solving method"
-        << std::endl;
-        Assert (false, ExcInternalError());
-
-    }
 
     MatrixTools::apply_boundary_values(boundary_values,
                                        system_matrix,
@@ -823,7 +773,7 @@ void Step6<dim>::output_results(const unsigned int cycle) const
 // merely needed extra arguments.
 
 template <int dim>
-void Step6<dim>::run(const unsigned int cycle, const std::string method, TableHandler results_table) {
+void Step6<dim>::run(const unsigned int cycle, TableHandler results_table) {
 
     std::cout << "Cycle:  " << cycle << std::endl;
     std::cout << "Subdomain:  " << s << std::endl;
@@ -848,9 +798,7 @@ void Step6<dim>::run(const unsigned int cycle, const std::string method, TableHa
               << std::endl;
     results_table.add_value("DoF", dof_handler.n_dofs());  /////////////////////////////////////////////////// table
 
-
-    //assemble_system(s, method);
-    assemble_system(method);
+    assemble_system();
 
 
         std::cout << "   Number of active cells:       "
@@ -885,21 +833,13 @@ int main()
             subdomain_problems[s] -> set_all_subdomain_objects(subdomain_problems);
         }
 
-        // Choose whether we use multiplicative or additive Schwarz to solve
-        std::string method;
-        std::cout <<
-        "Which Schwarz method would you like to use? (Multiplicative or Additive)" <<
-        std::endl;
-
-        std::cin >> method;
-
         TableHandler results_table; //////////////////////////////////////////////////////////////////////////////////// table
         Timer timer;
 
         // Now we can actually solve each subdomain problem
         for (unsigned int cycle=1; cycle<10; ++cycle)
             for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
-                subdomain_problems[s] -> run(cycle, method, results_table);
+                subdomain_problems[s] -> run(cycle, results_table);
 
                 std::cout << "After solving on subdomain " << s <<
                 " during cycle " << cycle << ":\n" <<
