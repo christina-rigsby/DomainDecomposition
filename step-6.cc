@@ -960,7 +960,7 @@ void Step6<dim>::assemble_system(const std::string method)
     //Impose boundary conditions for additive Schwarz
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// begin Part III additive Schwarz
-/*
+
 
 
 
@@ -1097,7 +1097,6 @@ void Step6<dim>::assemble_system(const std::string method)
                                                      boundary_values);
 
         } else Assert (false, ExcInternalError());
-*/
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// end Part III additive Schwarz
 
