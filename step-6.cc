@@ -54,6 +54,7 @@
 #include <deal.II/numerics/error_estimator.h>
 
 #include <cmath>
+#include <set>
 
 
 
@@ -80,24 +81,26 @@ public:
     Step6(const unsigned int s, TableHandler & results_table);
 
     void run(const unsigned int cycle);
+    void create_partition_solution(const unsigned int cycle);
 
     void set_all_subdomain_objects (const std::vector<std::shared_ptr<Step6<dim>>> &objects)
     { subdomain_objects = objects; }
 
     // std::vector<Vector<double>> solution_vector;
     std::vector<std::unique_ptr<Functions::FEFieldFunction<dim>>> solutionfunction_vector;
-
+    std::vector<std::unique_ptr<Functions::FEFieldFunction<dim>>> partition_solutionfunction_vector;
 
 
 private:
     void setup_system();
     void assemble_system();
     Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id);
-    void solve();
+    void solve(const unsigned int cycle);
 
     void refine_grid();
 
     void output_results(const unsigned int cycle) const;
+    void partition_output_results(const unsigned int cycle) const;
 
     const unsigned int s;
     std::vector<std::shared_ptr<Step6<dim>>> subdomain_objects;
@@ -115,6 +118,13 @@ private:
     Vector<double> system_rhs;
 
     TableHandler & results_table;
+
+    //Objects to create solution defined on the partitioned domain
+    std::set<typename Triangulation<dim>::active_cell_iterator> cells_to_remove;
+    Triangulation<dim> partition_triangulation;
+    FE_Q<dim>       partition_fe;
+    DoFHandler<dim> partition_dof_handler;
+    Vector<double> partition_solution;
 
 
 };
@@ -157,6 +167,8 @@ Step6<dim>::Step6(const unsigned int s, TableHandler &results_table)
         : s(s),
         fe(2),
         dof_handler(triangulation),
+        partition_fe(2), //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        partition_dof_handler(partition_triangulation), //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         results_table(results_table)
 
 {
@@ -179,9 +191,45 @@ Step6<dim>::Step6(const unsigned int s, TableHandler &results_table)
 
     triangulation.refine_global(4);
 
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+//Subtractively create partition from the current subdomain's triangulation///////////////////////////////////////////////////////////////////////
+    // First create the set of cells to remove from the current subdomain's triangulation.
+
+    for (typename Triangulation<2>::active_cell_iterator
+                 cell = triangulation.begin_active();
+         cell != triangulation.end(); ++cell)
+    {
+
+        //for (const auto &cell : triangulation.cell_iterators())
+        //    for (const auto &face : cell->face_iterators()) {
+        //        const auto center = face->center();
+        if (s == 0) {
+            if ((cell->center()[0] > 0.5) && (cell->center()[dim - 1] > 0.5)) {
+                cells_to_remove.insert(cell);
+            }
+        } else if (s == 1) {
+            if ((cell->center()[0] < 0.5) && (cell->center()[dim - 1] > 0.5)) {
+                cells_to_remove.insert(cell);
+            }
+        } else if (s == 2) {
+            if ((cell->center()[0] < 0.5) && (cell->center()[dim - 1] < 0.5)) {
+                cells_to_remove.insert(cell);
+            }
+        } else if (s == 3) {
+            if ((cell->center()[0] > 0.5) && (cell->center()[dim - 1] < 0.5)) {
+                cells_to_remove.insert(cell);
+            }
+        } else Assert (false, ExcInternalError());
+    }
+
+    GridGenerator::create_triangulation_with_removed_cells(triangulation, cells_to_remove, partition_triangulation);
+
+    cells_to_remove.clear();
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-// Lastly, we set boundary_ids (those not explicitly set to a value are
+
+// Lastly, we set boundary_ids for the subdomain triangulations (those not explicitly set to a value are
 // zero by default, a fact that we use later):
 
     //Set the boundary_ids of edges of subdomain0
@@ -432,6 +480,7 @@ template <int dim>
 void Step6<dim>::setup_system()
 {
     dof_handler.distribute_dofs(fe);
+    partition_dof_handler.distribute_dofs(partition_fe); //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     solution.reinit(dof_handler.n_dofs());
     system_rhs.reinit(dof_handler.n_dofs());
 
@@ -812,7 +861,7 @@ void Step6<dim>::assemble_system()
 
 template <int dim>
 //void Step6<dim>::solve(TableHandler results_table)
-void Step6<dim>::solve()
+void Step6<dim>::solve(const unsigned int cycle)
 {
     SolverControl solver_control(1000, 1e-12);
     SolverCG<Vector<double>> solver(solver_control);
@@ -832,6 +881,14 @@ void Step6<dim>::solve()
               << std::endl;
 
     //results_table.add_value("MaxSolValue", solution.linfty_norm()); //////////////////////////////////////////table
+
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    //Now interpolate the solution from the current subdomain onto the partition triangulation created from the
+    //current subdomain's triangulation
+    VectorTools::interpolate(partition_dof_handler,
+                             *subdomain_objects[s]->solutionfunction_vector[cycle],
+                             partition_solution);
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 }
 
@@ -868,6 +925,60 @@ void Step6<dim>::refine_grid()
 
     triangulation.execute_coarsening_and_refinement();
 
+}
+
+//NOT BEING USED:
+template <int dim>
+void Step6<dim>::create_partition_solution(const unsigned int cycle)
+{
+    //Subtractively create partition from the current subdomain's triangulation///////////////////////////////////////////////////////////////////////
+    // First create the set of cells to remove from the current subdomain's triangulation.
+
+    for (typename Triangulation<2>::active_cell_iterator
+         cell = triangulation.begin_active();
+         cell != triangulation.end(); ++cell)
+    {
+
+    //for (const auto &cell : triangulation.cell_iterators())
+    //    for (const auto &face : cell->face_iterators()) {
+    //        const auto center = face->center();
+            if (s == 0) {
+                if ((cell->center()[0] > 0.5) && (cell->center()[dim - 1] > 0.5)) {
+                    cells_to_remove.insert(cell);
+                }
+            } else if (s == 1) {
+                if ((cell->center()[0] < 0.5) && (cell->center()[dim - 1] > 0.5)) {
+                    cells_to_remove.insert(cell);
+                }
+            } else if (s == 2) {
+                if ((cell->center()[0] < 0.5) && (cell->center()[dim - 1] < 0.5)) {
+                    cells_to_remove.insert(cell);
+                }
+            } else if (s == 3) {
+                if ((cell->center()[0] > 0.5) && (cell->center()[dim - 1] < 0.5)) {
+                    cells_to_remove.insert(cell);
+                }
+            } else Assert (false, ExcInternalError());
+        }
+
+    GridGenerator::create_triangulation_with_removed_cells(triangulation, cells_to_remove, partition_triangulation);
+
+    cells_to_remove.clear();
+
+    //Associate a new dof handler with this triangulation:
+    //DoFHandler<dim> partition_dof_handler(partition_triangulation);
+
+    //Now interpolate the solution from the current subdomain onto the partition triangulation we just created from the
+    //current subdomain
+
+    VectorTools::interpolate(partition_dof_handler,
+                             *subdomain_objects[s]->solutionfunction_vector[cycle],
+                             partition_solution);
+
+    //std::unique_ptr<Functions::FEFieldFunction<dim>> partition_solutionfunction_pointer =
+    //        std::make_unique<Functions::FEFieldFunction<dim>>(partition_dof_handler, partition_solution);
+
+    //partition_solutionfunction_vector.emplace_back (std::move(partition_solutionfunction_pointer));
 
 }
 
@@ -876,8 +987,7 @@ void Step6<dim>::refine_grid()
 // @sect4{Step6::output_results}
 
 template <int dim>
-void Step6<dim>::output_results(const unsigned int cycle) const
-{
+void Step6<dim>::output_results(const unsigned int cycle) const {
 
     {
 
@@ -904,8 +1014,47 @@ void Step6<dim>::output_results(const unsigned int cycle) const
         data_out.write_vtu(output);
 
     }
+}
+
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+template <int dim>
+void Step6<dim>::partition_output_results(const unsigned int cycle) const {
+
+
+    //Do the same for the partition solutions:
+
+    {
+
+        GridOut partition_grid_out;
+
+        std::ofstream output("part_grid-" + std::to_string(s * 100 + cycle) + ".gnuplot");
+
+        GridOutFlags::Gnuplot part_gnuplot_flags(false, 5);
+        partition_grid_out.set_flags(part_gnuplot_flags);
+        MappingQGeneric<dim> part_mapping(3);
+        partition_grid_out.write_gnuplot(partition_triangulation, output, &part_mapping);
+
+    }
+
+    {
+
+        DataOut<dim> partition_data_out;
+        partition_data_out.attach_dof_handler(partition_dof_handler);
+        partition_data_out.add_data_vector(partition_solution, "solution");
+        partition_data_out.build_patches();
+
+        std::ofstream output("part_solution-" + std::to_string(s * 100 + cycle) + ".vtu");
+
+        partition_data_out.write_vtu(output);
+
+    }
 
 }
+
+//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
 
 
 // @sect4{Step6::run}
@@ -948,9 +1097,11 @@ void Step6<dim>::run(const unsigned int cycle)
         std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs() <<
         std::endl;
 
-    solve();
-
+    solve(cycle);
     output_results(cycle);
+
+    //create_partition_solution(cycle);
+    partition_output_results(cycle);
 
 }
 
@@ -979,29 +1130,35 @@ int main()
         Timer timer;
 
         // Now we can actually solve each subdomain problem
-        for (unsigned int cycle=1; cycle<26; ++cycle)
-            for (unsigned int s=0; s<subdomain_problems.size(); ++s) {
-                results_table.add_value("Cycle", cycle);                      ////////////////////////////////////// table
-                results_table.add_value("Subdomain", s);                      ////////////////////////////////////// table
-                results_table.add_value("CPUtimeTotal", timer.cpu_time());    ////////////////////////////////////// table
-                results_table.add_value("WalltimeTotal", timer.wall_time());  ////////////////////////////////////// table
+        for (unsigned int cycle=1; cycle<26; ++cycle) {
+            for (unsigned int s = 0; s < subdomain_problems.size(); ++s) {
+                results_table.add_value("Cycle",
+                                        cycle);                      ////////////////////////////////////// table
+                results_table.add_value("Subdomain",
+                                        s);                      ////////////////////////////////////// table
+                results_table.add_value("CPUtimeTotal",
+                                        timer.cpu_time());    ////////////////////////////////////// table
+                results_table.add_value("WalltimeTotal",
+                                        timer.wall_time());  ////////////////////////////////////// table
                 results_table.add_value("Method", "DD");  ////////////////////////////////////// table
 
                 //subdomain_problems[s] -> run(cycle, results_table);
-                subdomain_problems[s] -> run(cycle);
+                subdomain_problems[s]->run(cycle);
 
                 std::cout << "After solving on subdomain " << s <<
-                " during cycle " << cycle << ":\n" <<
-                "        Elapsed CPU time: " << timer.cpu_time() <<
-                " seconds.\n";
+                          " during cycle " << cycle << ":\n" <<
+                          "        Elapsed CPU time: " << timer.cpu_time() <<
+                          " seconds.\n";
 
                 std::cout << "        Elapsed wall time: " << timer.wall_time() <<
-                " seconds.\n";
-
-
-
+                          " seconds.\n";
 
             }
+
+
+        }
+
+
 
         timer.stop();
         timer.reset();
