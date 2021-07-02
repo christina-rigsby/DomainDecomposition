@@ -180,8 +180,6 @@ Step6<dim>::Step6(const unsigned int s, TableHandler &results_table)
         : s(s),
         fe(2),
         dof_handler(triangulation),
-        //partition_fe(2), //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        //partition_dof_handler(partition_triangulation), //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         results_table(results_table)
 
 {
@@ -632,9 +630,6 @@ Functions::FEFieldFunction<dim> &
         // from neighboring subdomains as the BC of the current subdomain, so we
         // retrieve the last entry of the appropriate solutionfunction_vector:
 
-
-        //return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.back();
-
         
         if (s < relevant_subdomain){
             return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.back();
@@ -934,6 +929,14 @@ void Step6<dim>::refine_grid()
     results_table.add_value("ActiveCells", triangulation.n_active_cells()); ////////////////////////////////// table
     results_table.add_value("DoF", dof_handler.n_dofs());  /////////////////////////////////////////////////// table
 
+    double solution_mean;
+    solution_mean = VectorTools::compute_mean_value (dof_handler,
+                                                     QGauss<2>(fe.degree + 1),
+                                                     solution,
+                                                     0);
+
+    results_table.add_value("MeanSolution", solution_mean);
+
     GridRefinement::refine_and_coarsen_fixed_number(triangulation,
                                                     estimated_error_per_cell,
                                                     0.07,
@@ -1102,11 +1105,10 @@ void Step6<dim>::run(const unsigned int cycle)
 
     std::cout << "   Number of active cells:       "
               << triangulation.n_active_cells() << std::endl;
-    results_table.add_value("ActiveCells", triangulation.n_active_cells()); ////////////////////////////////// table
+
 
     std::cout << "   Number of degrees of freedom: " << dof_handler.n_dofs()
               << std::endl;
-    results_table.add_value("DoF", dof_handler.n_dofs());  /////////////////////////////////////////////////// table
 
     assemble_system();
 
@@ -1150,17 +1152,14 @@ int main()
         // Now we can actually solve each subdomain problem
         for (unsigned int cycle=1; cycle<9; ++cycle) {
             for (unsigned int s = 0; s < subdomain_problems.size(); ++s) {
-                results_table.add_value("Cycle",
-                                        cycle);                      ////////////////////////////////////// table
-                results_table.add_value("Subdomain",
-                                        s);                      ////////////////////////////////////// table
-                results_table.add_value("CPUtimeTotal",
-                                        timer.cpu_time());    ////////////////////////////////////// table
-                results_table.add_value("WalltimeTotal",
-                                        timer.wall_time());  ////////////////////////////////////// table
+                results_table.add_value("Cycle", cycle);                      ////////////////////////////////////// table
+                results_table.add_value("Subdomain", s);                      ////////////////////////////////////// table
                 results_table.add_value("Method", "DD");  ////////////////////////////////////// table
 
                 subdomain_problems[s]->run(cycle);
+
+                results_table.add_value("CPUtimeTotal", timer.cpu_time());    ////////////////////////////////////// table
+                results_table.add_value("WalltimeTotal", timer.wall_time());  ////////////////////////////////////// table
 
                 std::cout << "After solving on subdomain " << s <<
                           " during cycle " << cycle << ":\n" <<
@@ -1171,6 +1170,12 @@ int main()
                           " seconds.\n";
 
             }
+
+
+
+
+            /*
+
 
             //After solving all subdomains during the current cycle, construct global solution:
 
@@ -1191,6 +1196,8 @@ int main()
             int max_refinement;
             max_refinement = *std::max_element(subdomain_refinement_levels.begin(), subdomain_refinement_levels.end());
             global_triangulation.refine_global(max_refinement);
+
+            std::cout << "Refinement level of global mesh: " << max_refinement << std::endl;
 
             for (const auto &cell : global_triangulation.cell_iterators())
             {
@@ -1225,6 +1232,31 @@ int main()
                     function_map,
                     global_solution);
 
+            //Compute global error
+            Vector<float> estimated_error_per_cell_global(global_triangulation.n_active_cells());
+            KellyErrorEstimator<2>::estimate(global_dof_handler,
+                                               QGauss<2 - 1>(global_fe.degree + 1),
+                                               {},
+                                               global_solution,
+                                               estimated_error_per_cell_global);
+
+
+
+            //Compute mean of the global solution:
+            double global_solution_mean;
+            global_solution_mean = VectorTools::compute_mean_value (global_dof_handler,
+                                                                    QGauss<2>(global_fe.degree + 1),
+                                                                    global_solution,
+                                                                    0);
+
+            std::cout << "Mean value of global solution: "
+                      << VectorTools::compute_mean_value (global_dof_handler,
+                                                          QGauss<2>(global_fe.degree + 1),
+                                                          global_solution,
+                                                          0)
+                      << global_solution_mean
+                      << std::endl;
+
 
             //Write out global information for visualization:
             {
@@ -1252,6 +1284,29 @@ int main()
                 data_out.write_vtu(output);
 
             }
+
+            //To know the elapsed wall time and CPU time to construct the global solution, we print these
+            //before and after the construction of the global solution and store in our data table so we can later
+            // subtract the two.
+
+
+            for (unsigned int s = 0; s < subdomain_problems.size(); ++s) {
+                results_table.add_value("CPUtimeTotal_after_global", timer.cpu_time());    ////////////////////////////////////// table
+                results_table.add_value("WalltimeTotal_after_global", timer.wall_time());  ////////////////////////////////////// table
+                results_table.add_value("ActiveCells_global", global_triangulation.n_active_cells()); ////////////////////////////////// table
+                results_table.add_value("DoF_global", global_dof_handler.n_dofs());  /////////////////////////////////////////////////// table
+                results_table.add_value("MeanSolution_global", global_solution_mean);
+                results_table.add_value("L2SolValue_global", global_solution.l2_norm()); //////////////////////////////////////////table
+                results_table.add_value("MaxSolValue_global", global_solution.linfty_norm()); //////////////////////////////////////////table
+                results_table.add_value("MaxError_global", estimated_error_per_cell_global.linfty_norm()); ///////////////////////// table
+            }
+
+
+
+        */
+
+
+
         }
 
         timer.stop();
