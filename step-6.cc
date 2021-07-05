@@ -79,37 +79,17 @@ class Step6
 {
 public:
     Step6(const unsigned int s, TableHandler & results_table);
-
     void run(const unsigned int cycle);
-    //void create_partition_solution(const unsigned int cycle);
-
-
     void set_all_subdomain_objects (const std::vector<std::shared_ptr<Step6<dim>>> &objects)
     { subdomain_objects = objects; }
-
-    // std::vector<Vector<double>> solution_vector;
     std::vector<std::unique_ptr<Functions::FEFieldFunction<dim>>> solutionfunction_vector;
-    //std::vector<std::unique_ptr<Functions::FEFieldFunction<dim>>> partition_solutionfunction_vector;
     Triangulation<dim> triangulation;
-
-
-/*
-    static bool cell_is_in_partition0(
-            const typename hp::DoFHandler<dim>::cell_iterator &cell);
-    static bool cell_is_in_partition1(
-            const typename hp::DoFHandler<dim>::cell_iterator &cell);
-    static bool cell_is_in_partition2(
-            const typename hp::DoFHandler<dim>::cell_iterator &cell);
-    static bool cell_is_in_partition3(
-            const typename hp::DoFHandler<dim>::cell_iterator &cell);
-*/
 
 private:
     void setup_system();
     void assemble_system();
     Functions::FEFieldFunction<dim> & get_fe_function(const unsigned int boundary_id);
     void solve(const unsigned int cycle);
-
     void refine_grid();
     void create_partition_solution(const unsigned int cycle);
     void output_results(const unsigned int cycle) const;
@@ -117,8 +97,6 @@ private:
 
     const unsigned int s;
     std::vector<std::shared_ptr<Step6<dim>>> subdomain_objects;
-
-    //Triangulation<dim> triangulation;
 
     FE_Q<dim>       fe;
     DoFHandler<dim> dof_handler;
@@ -131,14 +109,6 @@ private:
     Vector<double> system_rhs;
 
     TableHandler & results_table;
-
-    //Objects to create solution defined on the partitioned domain
-    //std::set<typename Triangulation<dim>::active_cell_iterator> cells_to_remove;
-    //Triangulation<dim> partition_triangulation;
-    //FE_Q<dim>       partition_fe;
-    //DoFHandler<dim> partition_dof_handler;
-    //Vector<double> partition_solution;
-
 
 };
 
@@ -201,45 +171,6 @@ Step6<dim>::Step6(const unsigned int s, TableHandler &results_table)
                                    corner_points[2 * s + 1]);
 
     triangulation.refine_global(4);
-
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-//Subtractively create partition from the current subdomain's triangulation///////////////////////////////////////////////////////////////////////
-    // First create the set of cells to remove from the current subdomain's triangulation.
-
-    /*
-    for (typename Triangulation<2>::active_cell_iterator
-                 cell = triangulation.begin_active();
-         cell != triangulation.end(); ++cell)
-    {
-
-        //for (const auto &cell : triangulation.cell_iterators())
-        //    for (const auto &face : cell->face_iterators()) {
-        //        const auto center = face->center();
-        if (s == 0) {
-            if ((cell->center()[0] > 0.5) && (cell->center()[dim - 1] > 0.5)) {
-                cells_to_remove.insert(cell);
-            }
-        } else if (s == 1) {
-            if ((cell->center()[0] < 0.5) && (cell->center()[dim - 1] > 0.5)) {
-                cells_to_remove.insert(cell);
-            }
-        } else if (s == 2) {
-            if ((cell->center()[0] < 0.5) && (cell->center()[dim - 1] < 0.5)) {
-                cells_to_remove.insert(cell);
-            }
-        } else if (s == 3) {
-            if ((cell->center()[0] > 0.5) && (cell->center()[dim - 1] < 0.5)) {
-                cells_to_remove.insert(cell);
-            }
-        } else Assert (false, ExcInternalError());
-    }
-
-    GridGenerator::create_triangulation_with_removed_cells(triangulation, cells_to_remove, partition_triangulation);
-
-    cells_to_remove.clear();
-     */
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 
 
 // Lastly, we set boundary_ids for the subdomain triangulations (those not explicitly set to a value are
@@ -626,11 +557,14 @@ Functions::FEFieldFunction<dim> &
         // " on gamma" << boundary_id << " is from subdomain " <<
         // relevant_subdomain << std::endl;
 
-        //For Multiplicative Schwarz, we impose the most recently computed solution
-        // from neighboring subdomains as the BC of the current subdomain, so we
-        // retrieve the last entry of the appropriate solutionfunction_vector:
+        //For restricted additive Schwarz, we impose solutions from the previous cycle
+        // as the BC of the current subdomain. To achieve this, we retrieve the last
+        // entry of the relevant_subdomain's solutionfunction_vector if relevant_subdomain
+        // has not yet been solved in the current cycle, and if relevant_subdomain has been
+        // solved in the current cycle, we retrieve the last entry of relevant_subdomain's
+        // solutionfunction_vector if it only contains one entry and retrieve its second
+        // to last entry otherwise.
 
-        
         if (s < relevant_subdomain){
             return *subdomain_objects[relevant_subdomain]->solutionfunction_vector.back();
         } else {
@@ -653,10 +587,10 @@ Functions::FEFieldFunction<dim> &
 // Next, we actually impose the appropriate solutions as boundary conditions on their
 // appropriate edges, which is done with VectorTools::interpolate_boundary_values.
 // We specify the function that will be applied as a boundary condition on the nonzero
-// boundary_ids using get_fe_function for multiplicative Schwarz but on the boundaries
-// with boudary_id of zero by default (the edges on the exterior of the entire domain)
-// we impose the homogenous Direchlet boundary condition by using
-// Functions::ZeroFunction<dim>() as the appropriate boundary function.
+// boundary_ids using get_fe_function, but on the boundaries with boudary_id of zero by
+// default (the edges on the exterior of the entire domain), we impose the homogenous
+// Direchlet boundary condition by using Functions::ZeroFunction<dim>() as the appropriate
+// boundary function.
 
 
 template <int dim>
@@ -889,26 +823,12 @@ void Step6<dim>::solve(const unsigned int cycle)
 
     std::cout << "  max solution value=" << solution.linfty_norm()
               << std::endl;
-
-    //results_table.add_value("MaxSolValue", solution.linfty_norm()); //////////////////////////////////////////table
-
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    //Now interpolate the solution from the current subdomain onto the partition triangulation created from the
-    //current subdomain's triangulation
-
-    //VectorTools::interpolate(partition_dof_handler,
-    //                         *subdomain_objects[s]->solutionfunction_vector[cycle],
-    //                         partition_solution);
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 }
-
 
 
 // @sect4{Step6::refine_grid}
 
 template <int dim>
-//void Step6<dim>::refine_grid(TableHandler results_table)
 void Step6<dim>::refine_grid()
 {
     Vector<float> estimated_error_per_cell(triangulation.n_active_cells());
@@ -947,64 +867,6 @@ void Step6<dim>::refine_grid()
 }
 
 
-/*
-//NOT BEING USED:
-template <int dim>
-void Step6<dim>::create_partition_solution(const unsigned int cycle)
-{
-    //Subtractively create partition from the current subdomain's triangulation///////////////////////////////////////////////////////////////////////
-    // First create the set of cells to remove from the current subdomain's triangulation.
-
-    for (typename Triangulation<2>::active_cell_iterator
-         cell = triangulation.begin_active();
-         cell != triangulation.end(); ++cell)
-    {
-
-    //for (const auto &cell : triangulation.cell_iterators())
-    //    for (const auto &face : cell->face_iterators()) {
-    //        const auto center = face->center();
-            if (s == 0) {
-                if ((cell->center()[0] > 0.5) && (cell->center()[dim - 1] > 0.5)) {
-                    cells_to_remove.insert(cell);
-                }
-            } else if (s == 1) {
-                if ((cell->center()[0] < 0.5) && (cell->center()[dim - 1] > 0.5)) {
-                    cells_to_remove.insert(cell);
-                }
-            } else if (s == 2) {
-                if ((cell->center()[0] < 0.5) && (cell->center()[dim - 1] < 0.5)) {
-                    cells_to_remove.insert(cell);
-                }
-            } else if (s == 3) {
-                if ((cell->center()[0] > 0.5) && (cell->center()[dim - 1] < 0.5)) {
-                    cells_to_remove.insert(cell);
-                }
-            } else Assert (false, ExcInternalError());
-        }
-
-    GridGenerator::create_triangulation_with_removed_cells(triangulation, cells_to_remove, partition_triangulation);
-
-    cells_to_remove.clear();
-
-    //Associate a new dof handler with this triangulation:
-    //DoFHandler<dim> partition_dof_handler(partition_triangulation);
-
-    //Now interpolate the solution from the current subdomain onto the partition triangulation we just created from the
-    //current subdomain
-
-    VectorTools::interpolate(partition_dof_handler,
-                             *subdomain_objects[s]->solutionfunction_vector[cycle],
-                             partition_solution);
-
-    //std::unique_ptr<Functions::FEFieldFunction<dim>> partition_solutionfunction_pointer =
-    //        std::make_unique<Functions::FEFieldFunction<dim>>(partition_dof_handler, partition_solution);
-
-    //partition_solutionfunction_vector.emplace_back (std::move(partition_solutionfunction_pointer));
-
-}
-
-*/
-
 // @sect4{Step6::output_results}
 
 template <int dim>
@@ -1036,47 +898,6 @@ void Step6<dim>::output_results(const unsigned int cycle) const {
 
     }
 }
-
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-/*
-template <int dim>
-void Step6<dim>::partition_output_results(const unsigned int cycle) const {
-
-
-    //Do the same for the partition solutions:
-
-    {
-
-        GridOut partition_grid_out;
-
-        std::ofstream output("part_grid-" + std::to_string(s * 100 + cycle) + ".gnuplot");
-
-        GridOutFlags::Gnuplot part_gnuplot_flags(false, 5);
-        partition_grid_out.set_flags(part_gnuplot_flags);
-        MappingQGeneric<dim> part_mapping(3);
-        partition_grid_out.write_gnuplot(partition_triangulation, output, &part_mapping);
-
-    }
-
-    {
-
-        DataOut<dim> partition_data_out;
-        partition_data_out.attach_dof_handler(partition_dof_handler);
-        partition_data_out.add_data_vector(partition_solution, "solution");
-        partition_data_out.build_patches();
-
-        std::ofstream output("part_solution-" + std::to_string(s * 100 + cycle) + ".vtu");
-
-        partition_data_out.write_vtu(output);
-
-    }
-
-}
-*/
-//%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-
 
 
 // @sect4{Step6::run}
@@ -1120,8 +941,6 @@ void Step6<dim>::run(const unsigned int cycle)
 
     solve(cycle);
     output_results(cycle);
-
-    //partition_output_results(cycle);
 
 }
 
@@ -1170,12 +989,6 @@ int main()
                           " seconds.\n";
 
             }
-
-
-
-
-            /*
-
 
             //After solving all subdomains during the current cycle, construct global solution:
 
@@ -1293,19 +1106,13 @@ int main()
             for (unsigned int s = 0; s < subdomain_problems.size(); ++s) {
                 results_table.add_value("CPUtimeTotal_after_global", timer.cpu_time());    ////////////////////////////////////// table
                 results_table.add_value("WalltimeTotal_after_global", timer.wall_time());  ////////////////////////////////////// table
-                results_table.add_value("ActiveCells_global", global_triangulation.n_active_cells()); ////////////////////////////////// table
-                results_table.add_value("DoF_global", global_dof_handler.n_dofs());  /////////////////////////////////////////////////// table
-                results_table.add_value("MeanSolution_global", global_solution_mean);
-                results_table.add_value("L2SolValue_global", global_solution.l2_norm()); //////////////////////////////////////////table
-                results_table.add_value("MaxSolValue_global", global_solution.linfty_norm()); //////////////////////////////////////////table
-                results_table.add_value("MaxError_global", estimated_error_per_cell_global.linfty_norm()); ///////////////////////// table
+                results_table.add_value("ActiveCells_global", global_triangulation.n_active_cells()); /////////////////////////// table
+                results_table.add_value("DoF_global", global_dof_handler.n_dofs());  //////////////////////////////////////////// table
+                results_table.add_value("MeanSolution_global", global_solution_mean); /////////////////////////////////////////// table
+                results_table.add_value("L2SolValue_global", global_solution.l2_norm()); //////////////////////////////////////// table
+                results_table.add_value("MaxSolValue_global", global_solution.linfty_norm()); /////////////////////////////////// table
+                results_table.add_value("MaxError_global", estimated_error_per_cell_global.linfty_norm()); ////////////////////// table
             }
-
-
-
-        */
-
-
 
         }
 
